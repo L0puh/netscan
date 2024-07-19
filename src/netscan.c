@@ -1,45 +1,45 @@
 #include "netscan.h"
-#include <netinet/in.h>
+
 #include <stdio.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#include <errno.h>
 
-char* get_host(const char* name, char* IPs[], int *IPs_size, char* aliases[], int *aliases_size){
-   int res;
-   struct hostent *host;
-   char **p_addr; 
-   char addr[INET6_ADDRSTRLEN];
-   if ( (host = gethostbyname(name)) == NULL){
-      printf("error in gethostbyname: %s\n", hstrerror(h_errno));
+char* get_addr_by_name(const char* name, char* IPs[], int *IPs_size){
+   int res, len, i;
+   char *cannonname, *buff;
+   struct addrinfo hints, *addr;
+   bzero(&hints, sizeof(hints));
+   hints.ai_flags = AI_CANONNAME;
+   hints.ai_family = AF_UNSPEC;
+  
+   if (getaddrinfo(name, NULL, &hints, &addr) == -1){
+      printf("error in getaddrinfo: %s\n", gai_strerror(errno));
       return NULL;
    }
+  
+   cannonname = malloc(strlen(addr->ai_canonname) * CHAR_BIT);
+   strcpy(cannonname, addr->ai_canonname);
 
-   *IPs_size = 0; *aliases_size = 0;
-   for (p_addr = host->h_aliases; *p_addr != NULL && *aliases_size < 10; p_addr++, (*aliases_size)++){
-      aliases[*aliases_size] = *p_addr;
-   }
-   p_addr = host->h_addr_list;
-   switch(host->h_addrtype){
-      case AF_INET:
-         for (; *p_addr != NULL && *IPs_size < 10; p_addr++, (*IPs_size)++){
-            const char* addr_str = inet_ntop(host->h_addrtype, *p_addr, addr, INET_ADDRSTRLEN);
-            IPs[*IPs_size] = malloc(INET_ADDRSTRLEN * sizeof(char));
-            strcpy(IPs[*IPs_size], addr_str);
-         }
-         break;
-      case AF_INET6: 
-         for (; *p_addr != NULL && *IPs_size < 10; p_addr++, (*IPs_size)++){
-            const char* addr_str = inet_ntop(host->h_addrtype, *p_addr, addr, INET6_ADDRSTRLEN);
-            IPs[*IPs_size] = malloc(INET6_ADDRSTRLEN * sizeof(char));
-            strcpy(IPs[*IPs_size], addr_str);
-         }
-         break;
+   *IPs_size = 0; i = 0;
+   do {
+      struct sockaddr_in *saddr = (struct sockaddr_in*) addr->ai_addr;
+      len = INET_ADDRSTRLEN;
+     
+      if (addr->ai_family == AF_INET6)
+         len = INET6_ADDRSTRLEN;
+      
+      buff = malloc(len);
+      inet_ntop(addr->ai_family, &saddr->sin_addr, buff, len);
 
-   }
-   char* host_name = malloc(strlen(host->h_name) * sizeof(char));
-   strcpy(host_name, host->h_name);
-   return host_name;
+      if (i == 0 || strcmp(buff, IPs[i-1]) != 0){
+         IPs[i] = malloc(len);
+         strcpy(IPs[i++], buff);
+      }
+      free(buff);
+   } while ((addr = addr->ai_next) != NULL && i+1 < MAX_IPS);
+   *IPs_size = i;
+   freeaddrinfo(addr);
+   return cannonname;
 }
-

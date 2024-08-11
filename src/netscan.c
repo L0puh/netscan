@@ -1,14 +1,17 @@
 #include "netscan.h"
+#include "utils.h"
 
+#include <ctype.h>
 #include <netdb.h>
+#include <unistd.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <errno.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 
 int get_ip_version(const char* host){
@@ -19,72 +22,91 @@ int get_ip_version(const char* host){
    return AF_INET;
 }
 
-int get_open_ports(const char* ip, int range, int *ports){
-   int family, len = 0;
 
-   if (range == 0 || ports == NULL || ip == NULL) return -1;
-   if (range > 65535) {
-      printf("impossible range\n");
+int get_open_ports(const char* ip, int start, int end, int *ports){
+   struct timeval timeout;
+   struct hostent *host;
+   struct sockaddr_in server_addr;
+   int family, len, buff_size, sockfd;
+
+   if (end == 0 || ports == NULL || ip == NULL) {
+      log_info(__func__, "unable to perform port scanning\n");
       return -1;
    }
+   if (end > 65535) {
+      log_info(__func__, "impossible range\n");
+      return -1;
+   }
+  
+   bzero(&server_addr, sizeof(server_addr));
+   server_addr.sin_family = AF_INET;
+   
+   if (isdigit(ip[0])){
+      server_addr.sin_addr.s_addr = inet_addr(ip);
+   } else if ((host = gethostbyname(ip)) != 0){
+      strncpy((char*)&server_addr.sin_addr, (char*)host->h_addr, sizeof server_addr.sin_addr);
+   }
 
-   family = get_ip_version(ip); 
-   for (int i = 0; i <= range; i++){
-      int sockfd = socket(family, SOCK_STREAM, 0);
-      if (family == AF_INET){
-         struct sockaddr_in server_addr;
-         bzero(&server_addr, sizeof(server_addr));
-         server_addr.sin_family = family;
-         server_addr.sin_port = htons(i); 
-         inet_pton(family, ip, &server_addr.sin_addr); 
-         if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
-            ports[len++] = i;
-         } 
-      } else {
-         struct sockaddr_in6 server_addr;
-         bzero(&server_addr, sizeof(server_addr));
-         server_addr.sin6_family = family;
-         server_addr.sin6_port = htons(i); 
-         inet_pton(family, ip, &server_addr.sin6_addr); 
-         if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
-            ports[len++] = i;           
-         } 
+   len = 0;
+   for (int i = start; i <= end; i++){
+      server_addr.sin_port = htons(i);
+
+      sockfd = socket(AF_INET, SOCK_STREAM, 0);
+      timeout.tv_sec = 1; timeout.tv_usec = 1;
+      setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+      setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+      ASSERT(sockfd);
+      if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
+         ports[len++] = i;
       }
       close(sockfd);
    }
    return len; 
 }
 
+
+
 char* get_addr_str(struct addrinfo *addr, int* len){
    char* buffer;
-   struct sockaddr_in *saddr;
-
-   saddr = (struct sockaddr_in*) addr->ai_addr;
-   *len = INET_ADDRSTRLEN;
   
-   if (addr->ai_family == AF_INET6)
+   if (addr->ai_family == AF_INET){
+      *len = INET_ADDRSTRLEN;
+      struct sockaddr_in *saddr = (struct sockaddr_in*) addr->ai_addr;
+      buffer = malloc(*len * CHAR_BIT);
+      inet_ntop(addr->ai_family, &saddr->sin_addr, buffer, *len);
+   }
+   else {
       *len = INET6_ADDRSTRLEN;
-   
-   buffer = malloc(*len * CHAR_BIT);
-   inet_ntop(addr->ai_family, &saddr->sin_addr, buffer, *len);
+      struct sockaddr_in6 *saddr = (struct sockaddr_in6*) addr->ai_addr;
+      buffer = malloc(*len * CHAR_BIT);
+      inet_ntop(addr->ai_family, &saddr->sin6_addr, buffer, *len);
+   }
    return buffer;
 }
 
 /* get ip addresses by hostname (IPv4 and IPv6) */
-char* get_addr_by_name(const char* name, char* IPs[], int *IPs_size){
+struct addrinfo* get_addr_by_name(const char* name){
+   struct addrinfo hints, *addr;
+   
+   bzero(&hints, sizeof(hints));
+   hints.ai_family = AF_UNSPEC;
+   hints.ai_flags = AI_CANONNAME;
+  
+   if (getaddrinfo(name, NULL, &hints, &addr) == -1){
+      log_info("getaddrinfo failed", gai_strerror(errno));
+      return NULL;
+   }
+   
+   return addr;
+}
+
+char* get_ips_by_name(const char* name, char* IPs[], int *IPs_size){
    int res, len, i;
    char *cannonname, *buff;
    struct addrinfo hints, *addr;
    
-   bzero(&hints, sizeof(hints));
-   hints.ai_flags = AI_CANONNAME;
-   hints.ai_family = AF_UNSPEC;
-  
-   if (getaddrinfo(name, NULL, &hints, &addr) == -1){
-      printf("error in getaddrinfo: %s\n", gai_strerror(errno));
-      return NULL;
-   }
-  
+   addr = get_addr_by_name(name); 
    cannonname = malloc(strlen(addr->ai_canonname) * CHAR_BIT);
    strcpy(cannonname, addr->ai_canonname);
 
@@ -100,4 +122,59 @@ char* get_addr_by_name(const char* name, char* IPs[], int *IPs_size){
    *IPs_size = i;
    freeaddrinfo(addr);
    return cannonname;
+}
+
+void get_options(){
+   printf("[1] port scanning\n");
+   printf("[2] list IPs of a hostname\n> ");
+   int choice;
+   scanf("%d", &choice);
+   switch(choice){
+      case 1:
+         {
+            int end, start, len;
+            char* hostname = malloc(240);
+
+            printf("\nenter hostname: ");
+            scanf("%s", hostname);
+            printf("enter start of range: ");
+            scanf("%d", &start);
+            printf("enter end of range: ");
+            scanf("%d", &end);
+
+            int ports[end-start+1];
+            len = get_open_ports(hostname, start, end, ports);
+            if (len == -1)
+               printf("\n[-] error in getting open ports\n");
+            else if (len == 0) 
+               printf("[-] no open ports were found\n");
+            else {
+               printf("\n[+] open ports: \n");
+               for (int i = 0; i < len; i++){
+                  printf("\tport %d is open\n", ports[i]);
+               }
+            }
+            free(hostname);
+            break;
+         }
+      case 2:
+         {
+            int ip_size;
+            char *name, *hostname, *IPs[MAX_IPS];;
+            hostname = malloc(240);
+            printf("enter hostname: ");
+            scanf("%s", hostname);
+            name = get_ips_by_name(hostname, IPs, &ip_size);
+            if (name != NULL){
+               printf("%s\n", name);
+               for (int i = 0; i < ip_size; i++)
+                  printf("\t%s\n", IPs[i]);
+            }
+            free(hostname);
+            break;
+         }
+      default:
+         printf("option doesn't exist, try again\n");
+   }
+
 }

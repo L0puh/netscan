@@ -70,7 +70,6 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
 }
 
 
-
 char* get_addr_str(struct addrinfo *addr, int* len){
    char* buffer;
   
@@ -128,93 +127,6 @@ char* get_ips_by_name(const char* name, char* IPs[], int *IPs_size){
    return cannonname;
 }
 
-void recv_buffer(char* buffer, size_t bytes, struct msghdr *msg, struct timeval *timerecv)
-{
-   double rtt;
-   int hdr_len, icmp_len;
-   struct ip *ip;
-   struct icmp *icmp;
-   struct timeval* timesend;
-
-   ip = (struct ip*) buffer;
-   if (ip->ip_p != IPPROTO_ICMP){
-      log_info(__func__, "packet isn't ICMP");
-      return;
-   }
-   hdr_len = ip->ip_hl << 2;
-   icmp = (struct icmp *) (buffer + hdr_len);
-   if ( (icmp_len = bytes - hdr_len) < 8){
-      log_info(__func__, "malformed packet");
-      return;
-   }
-   if (icmp->icmp_type == ICMP_ECHOREPLY){
-      timesend = (struct timeval*) icmp->icmp_data;
-      if ((timerecv->tv_usec -= timesend->tv_usec) < 0){
-         --timerecv->tv_sec;
-         timerecv->tv_usec += 100000;
-      }
-      timerecv->tv_sec -= timesend->tv_sec;
-      rtt = timerecv->tv_sec * 1000.0 + timerecv->tv_usec / 1000.0;
-      printf("%d bytes: seq=%u ttl=%d rtt=%.2f ms\n",
-            icmp_len, icmp->icmp_seq, ip->ip_ttl, rtt); 
-   } else {
-      printf("%d bytes: type=%d code=%d\n",
-            icmp_len, icmp->icmp_type, icmp->icmp_code); 
-   }
-
-}
-
-void send_v4(){
-   /* TODO */
-}
-
-
-void ping(char* host){
-   struct iovec iov;
-   struct addrinfo *addr;
-   struct timeval time;
-   struct msghdr msg;
-
-   char buffer[1024], controlbuffer[1024];
-   int sockfd, str_addrlen, size, bytes;
-   
-   addr = get_addr_by_name(host);
-   printf("ping %s (%s):\n", addr->ai_canonname ? addr->ai_canonname: host, get_addr_str(addr, &str_addrlen));
-
-   if (addr->ai_family == AF_INET){
-      sockfd = socket(addr->ai_family, SOCK_RAW, IPPROTO_ICMP);
-   } else 
-      sockfd = socket(addr->ai_family, SOCK_RAW, IPPROTO_ICMPV6);
-
-   size = 60 * 1024; 
-   setsockopt(sockfd, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size));
-   
-   iov.iov_base = buffer;
-   iov.iov_len = sizeof(buffer);
-   msg.msg_name = calloc(1, addr->ai_addrlen);
-   msg.msg_iov = &iov;
-   msg.msg_iovlen = 1;
-   msg.msg_control = controlbuffer;
-   
-   while (1){
-      msg.msg_namelen = addr->ai_addrlen;
-      msg.msg_controllen = sizeof(controlbuffer);
-      ASSERT((bytes = recvmsg(sockfd, &msg, 0)));
-      gettimeofday(&time, NULL);
-      
-      if (addr->ai_family == AF_INET){
-         send_v4();
-         recv_buffer(buffer, bytes, &msg, &time);
-      } else {
-         /* TODO: */
-         /* recv_buffer_v6(buffer, bytes, &msg, &time); */
-         return;
-      }
-
-   }
-
-
-}
 
 
 void get_options(){

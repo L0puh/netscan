@@ -13,6 +13,7 @@ char* get_ips_by_name(const char* name, char* IPs[], int *IPs_size);
 char* get_addr_str(struct addrinfo *addr, int* len);
 struct addrinfo* get_addr_by_name(const char* name);
 
+void ping(char* host);
 void get_options();
 
 

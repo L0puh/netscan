@@ -70,22 +70,45 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
 }
 
 
-char* get_addr_str(struct addrinfo *addr, int* len){
-   char* buffer;
-  
-   if (addr->ai_family == AF_INET){
-      *len = INET_ADDRSTRLEN;
-      struct sockaddr_in *saddr = (struct sockaddr_in*) addr->ai_addr;
-      buffer = malloc(*len * CHAR_BIT);
-      inet_ntop(addr->ai_family, &saddr->sin_addr, buffer, *len);
+char* get_hostname(struct sockaddr* in_addr){
+   int ret_code;
+   socklen_t addrlen = sizeof(*in_addr);
+   char *host = malloc(NI_MAXHOST);;
+   char serv[NI_MAXSERV];
+
+	if ((ret_code = getnameinfo(in_addr, addrlen, host, NI_MAXHOST, serv, NI_MAXSERV, 0)) != 0){
+      log_info("getnameinfo failed", gai_strerror(ret_code));
+      return NULL;
    }
-   else {
-      *len = INET6_ADDRSTRLEN;
-      struct sockaddr_in6 *saddr = (struct sockaddr_in6*) addr->ai_addr;
-      buffer = malloc(*len * CHAR_BIT);
-      inet_ntop(addr->ai_family, &saddr->sin6_addr, buffer, *len);
+
+   return host;
+}
+
+char* get_addr_str(struct sockaddr* in_addr){
+   char* str;
+   struct addrinfo *addrinfo;
+   switch(in_addr->sa_family){
+      case AF_INET: 
+         {
+            str = malloc(INET_ADDRSTRLEN);
+            struct sockaddr_in *addr = (struct sockaddr_in*) in_addr;
+            inet_ntop(AF_INET, &addr->sin_addr, str, INET_ADDRSTRLEN);
+            return str;
+         
+         }
+      case AF_INET6:
+         {
+            str = malloc(INET6_ADDRSTRLEN);
+            struct sockaddr_in6 *addr = (struct sockaddr_in6*) in_addr;
+            inet_ntop(AF_INET6, &addr->sin6_addr, str, INET6_ADDRSTRLEN);
+            return str;
+         }
+      default:
+         return NULL;
+
    }
-   return buffer;
+
+   return NULL;
 }
 
 /* get ip addresses by hostname (IPv4 and IPv6) */
@@ -115,7 +138,7 @@ char* get_ips_by_name(const char* name, char* IPs[], int *IPs_size){
 
    *IPs_size = 0; i = 0;
    do {
-      buff = get_addr_str(addr, &len);
+      buff = get_addr_str(addr->ai_addr);
       if (i == 0 || strcmp(buff, IPs[i-1]) != 0){
          IPs[i] = malloc(len);
          strcpy(IPs[i++], buff);

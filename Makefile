@@ -1,4 +1,4 @@
-CC=gcc
+CC=sudo gcc
 INCLUDE_DIR=include
 BUILD_DIR=build
 SRC_DIR=src
@@ -13,6 +13,7 @@ $(BUILD_DIR)/%.o: %.c
 
 netscan: $(OBJ)
 	$(CC) -o $@ $(OBJ) $(CFLAGS)
+	sudo chmod u+s $@
 
 clean: 
 	rm -rf $(BUILD_DIR) netscan

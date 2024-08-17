@@ -36,13 +36,21 @@ struct addrinfo* get_addr_by_name(const char* name);
 
 void ping(char* host);
 void recv_packet(int sockfd);
-void send_packet(int sockfd, struct addrinfo*);
+
 void time_difference(struct timeval* out, struct timeval *in);
-int  process_packet(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr);
+
+int init_ping_socket_v4(int rcvfbuf_size);
+int init_ping_socket_v6(int rcvfbuf_size);
+
+void send_packet_v6(int sockfd, struct addrinfo *addr);
+void send_packet_v4(int sockfd, struct addrinfo *addr);
+
+int  process_packet_v4(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr);
+int  process_packet_v6(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr);
 
 void sig_alrm(int signo);
 void sig_termination(int signo);
 
-unsigned short get_checksum(unsigned short *addr, size_t len);
+unsigned short get_checksum(unsigned short *data, size_t len);
 
 #endif

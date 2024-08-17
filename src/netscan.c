@@ -17,15 +17,12 @@
 #include <limits.h>
 #include <errno.h>
 
-
 int get_ip_version(const char* host){
    unsigned char buf[sizeof(struct in6_addr)];
-   if (inet_pton(AF_INET, host, &buf) == 0){
+   if (inet_pton(AF_INET, host, &buf) == 0)
       return AF_INET6;
-   }
    return AF_INET;
 }
-
 
 int get_open_ports(const char* ip, int start, int end, int *ports){
    struct timeval timeout;
@@ -56,7 +53,7 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
       server_addr.sin_port = htons(i);
 
       sockfd = socket(AF_INET, SOCK_STREAM, 0);
-      timeout.tv_sec = 1; timeout.tv_usec = 1;
+      timeout.tv_sec = 1; timeout.tv_usec = 0;
       setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
       setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
@@ -76,11 +73,12 @@ char* get_hostname(struct sockaddr* in_addr){
    char *host = malloc(NI_MAXHOST);;
    char serv[NI_MAXSERV];
 
+   if (in_addr->sa_family == AF_INET6) return NULL;
+
 	if ((ret_code = getnameinfo(in_addr, addrlen, host, NI_MAXHOST, serv, NI_MAXSERV, 0)) != 0){
       log_info("getnameinfo failed", gai_strerror(ret_code));
       return NULL;
    }
-
    return host;
 }
 
@@ -118,6 +116,7 @@ struct addrinfo* get_addr_by_name(const char* name){
    bzero(&hints, sizeof(hints));
    hints.ai_family = AF_UNSPEC;
    hints.ai_flags = AI_CANONNAME;
+   hints.ai_socktype = SOCK_STREAM;
   
    if (getaddrinfo(name, NULL, &hints, &addr) == -1){
       log_info("getaddrinfo failed", gai_strerror(errno));

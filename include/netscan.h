@@ -21,7 +21,6 @@ struct PING_GLOBAL{
 };
 
 
-void  get_options();
 int   get_ip_version(const char* host);
 int   get_open_ports(const char* ip, int start, int end, int *ports);
 char* get_ips_by_name(const char* name, char* IPs[], int *IPs_size);
@@ -29,7 +28,6 @@ char* get_hostname(struct sockaddr* in_addr);
 char* get_addr_str(struct sockaddr* in_addr);
 
 struct addrinfo* get_addr_by_name(const char* name);
-
 
 
 /****************** PING ***************************/

@@ -1,21 +1,7 @@
-/**********************************
-
-
-NOTE: compile and run 
-      with sudo permissions
-
-TODO:
-
-- ttl for IPv6
- 
- ***********************************/
-
-
 #include "netscan.h"
 #include "utils.h"
 
 #include <arpa/inet.h>
-#include <errno.h>
 #include <netdb.h>
 
 #include <netinet/ip_icmp.h>
@@ -77,6 +63,7 @@ void ping(char* host){
       sockfd = init_ping_socket_v4(size);
    else 
       sockfd = init_ping_socket_v6(size);
+   
   
    setuid(getuid());
 
@@ -120,11 +107,13 @@ void time_difference(struct timeval* out, struct timeval *in){
    out->tv_sec-=in->tv_sec;
 }
 
-int process_packet_v6(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr){
+int process_packet_v6(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr, struct msghdr* msg){
    double rtt;
+   int hop_limit;
    char* hostname;
    struct icmp6_hdr *icmp6;
    struct timeval *sent_time;
+   struct cmsghdr *cmsg;
 
    icmp6 = (struct icmp6_hdr*) buffer;
    if (icmp6->icmp6_type == ICMP6_ECHO_REPLY){
@@ -141,11 +130,16 @@ int process_packet_v6(char *buffer, int len, struct timeval* recv_time, struct s
       time_difference(recv_time, sent_time);
       rtt = recv_time->tv_sec*1000.0 + recv_time->tv_usec/1000.0;
       
+      for (cmsg = CMSG_FIRSTHDR(msg); cmsg != NULL; cmsg = CMSG_NXTHDR(msg, cmsg)){
+         if (cmsg->cmsg_level == IPPROTO_ICMPV6 && cmsg->cmsg_type == IPV6_HOPLIMIT){
+            hop_limit = *(u_int32_t*) CMSG_DATA(cmsg);
+            break;
+         }
+      }
       hostname = get_hostname(from_addr);
-      printf("%d bytes from %s: icmp_seq=%u rtt=%.2f ms\n",
-            len, hostname ? hostname: get_addr_str(from_addr), icmp6->icmp6_seq, rtt);
+      printf("%d bytes from %s: icmp_seq=%u hlim=%d rtt=%.2f ms\n",
+            len, hostname ? hostname: get_addr_str(from_addr), icmp6->icmp6_seq, hop_limit, rtt);
       global.received_packets++;
-
 
    } else {
       printf("%d bytes: type = %d, code = %d\n", len, icmp6->icmp6_type, icmp6->icmp6_code);
@@ -196,22 +190,31 @@ int process_packet_v4(char *buffer, int len, struct timeval* recv_time, struct s
 void recv_packet(int sockfd){
    int bytes;
    socklen_t addrlen;
-   extern int errno;
+   struct msghdr msg;
+   struct iovec iov;
    struct timeval timeval;
    struct sockaddr_storage addr;
-   char recvbuff[PACKET_SIZE];
+   char recvbuff[PACKET_SIZE], controlbuff[PACKET_SIZE];
 
    sig_alrm(SIGALRM);
+
+   iov.iov_base = recvbuff;
+   iov.iov_len = sizeof(recvbuff);
+   msg.msg_name = (struct sockaddr*)&addr; 
+   msg.msg_iov = &iov;
+   msg.msg_iovlen = 1;
+   msg.msg_control = controlbuff;
   
    while(1){
+      msg.msg_namelen = global.addr->ai_addrlen; 
+      msg.msg_controllen = sizeof(controlbuff);
       addrlen = sizeof(addr);
-      ASSERT((bytes = recvfrom(sockfd, recvbuff, sizeof(recvbuff), 0, 
-                     (struct sockaddr*)&addr, &addrlen)));
+      ASSERT((bytes = recvmsg(sockfd, &msg, 0)));
       gettimeofday(&timeval, NULL);
       if (addr.ss_family == AF_INET)
          process_packet_v4(recvbuff, bytes, &timeval, (struct sockaddr*) &addr);
       else 
-         process_packet_v6(recvbuff, bytes, &timeval, (struct sockaddr*) &addr);
+         process_packet_v6(recvbuff, bytes, &timeval, (struct sockaddr*) &addr, &msg);
    }
 }
 

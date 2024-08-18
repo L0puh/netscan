@@ -46,7 +46,7 @@ void send_packet_v6(int sockfd, struct addrinfo *addr);
 void send_packet_v4(int sockfd, struct addrinfo *addr);
 
 int  process_packet_v4(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr);
-int  process_packet_v6(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr);
+int  process_packet_v6(char *buffer, int len, struct timeval*, struct sockaddr*, struct msghdr*);
 
 void sig_alrm(int signo);
 void sig_termination(int signo);

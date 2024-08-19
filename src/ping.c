@@ -16,7 +16,7 @@
 #include <unistd.h>
 
 
-struct PING_GLOBAL global;
+static struct PING_GLOBAL global;
 
 
 int init_ping_socket_v4(int rcvfbuf_size){
@@ -51,27 +51,30 @@ int init_ping_socket_v6(int rcvfbuf_size){
 }
 
 void ping(char* host){
-   
    pid_t pid;
    int sockfd, len, size;
    struct addrinfo *addr;
 
    addr = get_addr_by_name(host);
    
+   if (addr->ai_addr == NULL){
+      log_info(__func__, "corrupted address, unable to reach");
+      return;
+   }
+
    size = 50*1024;
    if (addr->ai_family == AF_INET)
       sockfd = init_ping_socket_v4(size);
    else 
       sockfd = init_ping_socket_v6(size);
    
-  
    setuid(getuid());
-
+   
    printf("PING %s(%s): %d bytes\n", 
                addr->ai_canonname ? addr->ai_canonname: host, 
                get_addr_str(addr->ai_addr), DATALEN);
 
-   signal(SIGALRM, sig_alrm);
+   signal(SIGALRM, ping_alrm);
    signal(SIGINT, sig_termination);
    global.pid = getpid() & 0xffff;
    global.sockfd = sockfd;
@@ -79,7 +82,7 @@ void ping(char* host){
    global.received_packets = 0;
    global.sent_packets = 0;
    recv_packet(sockfd);
-   sig_alrm(SIGALRM);
+   ping_alrm(SIGALRM);
    
    return;
 }
@@ -90,7 +93,7 @@ void sig_termination(int signo){
    exit(0);
 }
 
-void sig_alrm(int signo){
+void ping_alrm(int signo){
    if (global.addr->ai_family == AF_INET)
       send_packet_v4(global.sockfd, global.addr);
    else 
@@ -196,7 +199,7 @@ void recv_packet(int sockfd){
    struct sockaddr_storage addr;
    char recvbuff[PACKET_SIZE], controlbuff[PACKET_SIZE];
 
-   sig_alrm(SIGALRM);
+   ping_alrm(SIGALRM);
 
    iov.iov_base = recvbuff;
    iov.iov_len = sizeof(recvbuff);

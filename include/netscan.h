@@ -20,7 +20,6 @@ struct PING_GLOBAL{
    int sockfd;
 };
 
-
 int   get_ip_version(const char* host);
 int   get_open_ports(const char* ip, int start, int end, int *ports);
 char* get_ips_by_name(const char* name, char* IPs[], int *IPs_size);
@@ -46,9 +45,15 @@ void send_packet_v4(int sockfd, struct addrinfo *addr);
 int  process_packet_v4(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr);
 int  process_packet_v6(char *buffer, int len, struct timeval*, struct sockaddr*, struct msghdr*);
 
-void sig_alrm(int signo);
+void ping_alrm(int signo);
 void sig_termination(int signo);
 
 unsigned short get_checksum(unsigned short *data, size_t len);
+
+
+
+/****************** TRACEROUTE ***************************/
+
+void traceroute(char* host, int max_ttl);
 
 #endif

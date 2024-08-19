@@ -116,12 +116,11 @@ struct addrinfo* get_addr_by_name(const char* name){
    bzero(&hints, sizeof(hints));
    hints.ai_family = AF_UNSPEC;
    hints.ai_flags =  AI_CANONNAME;
-  
+
    if (getaddrinfo(name, NULL, &hints, &addr) == -1){
       log_info("getaddrinfo failed", gai_strerror(errno));
       return NULL;
    }
-   
    return addr;
 }
 

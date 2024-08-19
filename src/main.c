@@ -12,25 +12,20 @@ int main(int argc, char* argv[]) {
    
    if (argc == 1) print_usage(argv[0]);
 
-   while((opt = getopt(argc, argv, "pol?:")) != -1){
+   while((opt = getopt(argc, argv, "p:o:l:t:")) != -1){
       switch(opt){
          case 'p':
             {
-               if (optind < argc)
-                  hostname = argv[optind];
-               else {
-                  fprintf(stderr, "usage: %s -p [hostname]\n", argv[0]);
-                  return -1;
-               }
+               hostname = optarg;
                ping(hostname);
                break;
             }
          case 'o':
             {
-               if (optind+2 < argc){
-                  hostname = argv[optind];
-                  start = atoi(argv[optind+1]);
-                  end = atoi(argv[optind+2]);
+               if (optind+1 < argc){
+                  hostname = optarg;
+                  start = atoi(argv[optind]);
+                  end = atoi(argv[optind+1]);
                } else {
                   fprintf(stderr, "usage: %s -o [hostname] [start port] [end port]\n", argv[0]);
                   return -1;
@@ -50,12 +45,7 @@ int main(int argc, char* argv[]) {
             }
          case 'l':
             {
-               if (optind < argc){
-                  hostname = argv[optind];
-               } else {
-                  fprintf(stderr, "usage: %s -l [hostname]\n", argv[0]);
-                  return -1;
-               }
+               hostname = optarg;
                name = get_ips_by_name(hostname, IPs, &ip_size);
                if (name != NULL){
                   printf("%s\n", name);
@@ -63,6 +53,20 @@ int main(int argc, char* argv[]) {
                      printf("\t%s\n", IPs[i]);
                }
                break;
+            }
+         case 't':
+            {
+               int max_ttl = 30;
+               hostname = optarg; 
+              
+               if (optind < argc){
+                  max_ttl = atoi(argv[optind]);
+                  if (max_ttl <= 1) {
+                     log_info(__func__, "ivalid ttl");
+                     return 0;
+                  }
+               }
+               traceroute(hostname, max_ttl);
             }
          default:
             print_usage(argv[0]);
@@ -74,8 +78,9 @@ int main(int argc, char* argv[]) {
 
 void print_usage(char* argv){
    fprintf(stderr, "usage:\n\
-      -p [hostname]               - ping hostname\n\
-      -o [hostname] [start] [end] - scan open ports\n\
-      -l [hostname]               - list available IPs\n\n\
+      -p [hostname]                        - ping hostname\n\
+      -o [hostname] [start] [end]          - scan open ports\n\
+      -l [hostname]                        - list available IPs\n\
+      -t [hostname] [max ttl (default 30)] - traceroute\n\n\
    example: %s -o google.com 75 90\n", argv);
 }

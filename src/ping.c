@@ -4,9 +4,6 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#include <netinet/ip_icmp.h>
-#include <netinet/icmp6.h>
-#include <netinet/ip6.h>
 
 #include <signal.h>
 #include <stdio.h>
@@ -75,7 +72,7 @@ void ping(char* host){
                get_addr_str(addr->ai_addr), DATALEN);
 
    signal(SIGALRM, ping_alrm);
-   signal(SIGINT, sig_termination);
+   signal(SIGINT, ping_termination);
    global.pid = getpid() & 0xffff;
    global.sockfd = sockfd;
    global.addr = addr;
@@ -87,7 +84,7 @@ void ping(char* host){
    return;
 }
 
-void sig_termination(int signo){
+void ping_termination(int signo){
    printf("\nstatistics:\n\tsent: %d;\n\treceived: %d\n\t%.2f%% lost\n", global.sent_packets, global.received_packets,
             ((float)(global.sent_packets-global.received_packets)/global.sent_packets)*100.f);
    exit(0);

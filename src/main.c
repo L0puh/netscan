@@ -67,6 +67,7 @@ int main(int argc, char* argv[]) {
                   }
                }
                traceroute(hostname, max_ttl);
+               break;
             }
          default:
             print_usage(argv[0]);

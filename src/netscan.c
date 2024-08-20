@@ -146,3 +146,15 @@ char* get_ips_by_name(const char* name, char* IPs[], int *IPs_size){
    freeaddrinfo(addr);
    return cannonname;
 }
+
+void set_port(struct sockaddr* addr, int port){
+   if (addr->sa_family == AF_INET){
+      struct sockaddr_in* addr_in;
+      addr_in = (struct sockaddr_in*) addr;
+      addr_in->sin_port = htons(port);
+   } else {
+      struct sockaddr_in6* addr_in;
+      addr_in = (struct sockaddr_in6*) addr;
+      addr_in->sin6_port = htons(port);
+   }
+}

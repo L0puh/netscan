@@ -76,7 +76,7 @@ char* get_hostname(struct sockaddr* in_addr){
    if (in_addr->sa_family == AF_INET6) return NULL;
 
 	if ((ret_code = getnameinfo(in_addr, addrlen, host, NI_MAXHOST, serv, NI_MAXSERV, 0)) != 0){
-      log_info("getnameinfo failed", gai_strerror(ret_code));
+      /* log_info("getnameinfo failed", gai_strerror(ret_code)); */
       return NULL;
    }
    return host;
@@ -157,4 +157,24 @@ void set_port(struct sockaddr* addr, int port){
       addr_in = (struct sockaddr_in6*) addr;
       addr_in->sin6_port = htons(port);
    }
+}
+int cmp_addr(struct sockaddr* x, struct sockaddr* y){
+
+   int n;
+   if (x->sa_family != y->sa_family) return -1;
+
+   switch (x->sa_family){
+      case AF_INET:
+         n = memcmp( &((struct sockaddr_in*) x)->sin_addr, 
+                     &((struct sockaddr_in*) y)->sin_addr,
+                     sizeof(struct in_addr));
+         return n;
+      case AF_INET6:
+         n = memcmp( &((struct sockaddr_in6*) x)->sin6_addr,
+                     &((struct sockaddr_in6*) y)->sin6_addr,
+                     sizeof(struct in6_addr));
+         return n;
+
+   }
+   return -1;
 }

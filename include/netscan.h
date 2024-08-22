@@ -31,14 +31,14 @@ struct PING_GLOBAL{
 
 struct TRACEROUTE_GLOBAL {
    int port;
-   int is_alrm;
    pid_t pid;
+   int is_alrm;
 
    int packets_sent;
    int sockfd_recv;
    int sockfd_send;
-   struct sockaddr* addr;
-   struct sockaddr* last_addr;
+   struct sockaddr* send_addr;
+   struct sockaddr* recv_addr;
    struct sockaddr* bind_addr;
 };
 
@@ -60,6 +60,7 @@ char* get_addr_str(struct sockaddr* in_addr);
 struct addrinfo* get_addr_by_name(const char* name);
 
 void set_port(struct sockaddr* addr, int port);
+int cmp_addr(struct sockaddr* x, struct sockaddr* y);
 
 /****************** PING ***************************/
 

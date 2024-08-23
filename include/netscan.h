@@ -14,7 +14,8 @@
 
 #define DATALEN 56
 #define PACKETS_COUNT 5
-#define PACKET_SIZE 4096
+#define PACKET_SIZE 4096 /* ping packet */
+#define BUFFER_SIZE 1500 /* traceroute packet */
 #define WAIT_TIME 1
 #define PORT 30000
 #define MAX_PROBES 3
@@ -37,6 +38,7 @@ struct TRACEROUTE_GLOBAL {
    int packets_sent;
    int sockfd_recv;
    int sockfd_send;
+   socklen_t addr_len;
    struct sockaddr* send_addr;
    struct sockaddr* recv_addr;
    struct sockaddr* bind_addr;
@@ -97,5 +99,9 @@ void init_traceroute_socket_v4();
 void init_traceroute_socket_v6();
 
 char* get_icmp_code(int code);
+void send_loop(int max_ttl);
+
+int recv_udp_v6(int seq, struct timeval *time);
+int recv_udp(int seq, struct timeval *time);
 
 #endif

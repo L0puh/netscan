@@ -13,10 +13,68 @@
 #include <sys/time.h>
 #include <sys/types.h>
 
-#define BUFFER_SIZE 1500
 static struct TRACEROUTE_GLOBAL global;
 
+int recv_udp_v6(int seq, struct timeval *time){ 
+   int code;
+   socklen_t len;
+   struct udphdr *udp;
+   struct ip6_hdr *hip;
+   struct icmp6_hdr *icmp;
+   struct sigaction sigact;
+   int bytes, icmp_len;
 
+   char buffer[BUFFER_SIZE];
+
+   sigemptyset(&sigact.sa_mask);
+   sigact.sa_handler = sig_alrm;
+   sigact.sa_flags = 0;
+   sigaction(SIGALRM, &sigact, NULL);    
+
+   alarm(WAIT_TIME);
+   global.is_alrm = 0;
+   
+   while(1){ 
+      if (global.is_alrm) return -3;
+
+      len = global.addr_len;
+      ASSERT((bytes = recvfrom(global.sockfd_recv, buffer, 
+                   BUFFER_SIZE, 0, global.recv_addr, &len)));
+
+      icmp = (struct icmp6_hdr *) buffer;
+      if ((icmp_len = bytes) < 8) continue;
+      if (icmp->icmp6_type == ICMP6_TIME_EXCEEDED &&
+          icmp->icmp6_code == ICMP6_TIME_EXCEED_TRANSIT)
+      {
+         if (icmp_len < 8 + sizeof(struct ip6_hdr) + 4) continue;
+         hip = (struct ip6_hdr *)(buffer+8);
+         udp = (struct udphdr*)(buffer + 8 + sizeof(struct ip6_hdr));
+         if (hip->ip6_nxt == IPPROTO_UDP &&
+            udp->uh_sport == htons(global.port) &&
+            udp->uh_dport == htons(seq + PORT)) code = -2;
+         break;
+      } else if (icmp->icmp6_type == ICMP6_DST_UNREACH) {
+         if (icmp_len < 8 + sizeof(struct ip6_hdr) + 4) continue;
+         hip = (struct ip6_hdr*)(buffer+8);
+         udp = (struct udphdr*) (buffer + 8 + sizeof(struct ip6_hdr));
+         if (hip->ip6_nxt == IPPROTO_UDP && udp->uh_sport == htons(global.port)
+            && udp->uh_dport == htons(PORT + seq)) {
+            if (icmp->icmp6_code == ICMP6_DST_UNREACH_NOPORT) code = -1;
+            else code = icmp->icmp6_code;
+            break;
+         }
+      } else {
+         printf(" (from %s: type: %d, code: %d)\n", get_hostname(global.recv_addr), 
+                                                    icmp->icmp6_type,
+                                                    icmp->icmp6_code);
+      }
+   } 
+   alarm(0);
+   gettimeofday(time, NULL);
+   return code;
+
+   
+}
 int recv_udp(int seq, struct timeval *time){
    int header_len, icmp_len;
    socklen_t len;
@@ -38,7 +96,7 @@ int recv_udp(int seq, struct timeval *time){
    while(1){
       if (global.is_alrm) return -3;
 
-      len = sizeof(struct sockaddr);
+      len = global.addr_len;
       ASSERT((bytes = recvfrom(global.sockfd_recv, buffer, 
                    BUFFER_SIZE, 0, global.recv_addr, &len)));
       
@@ -93,7 +151,7 @@ void send_loop(int max_ttl){
    upd_packet_t *pck;
    struct timeval time_recv;
   
-   last_addr = calloc(1, sizeof(struct sockaddr));
+   last_addr = calloc(1, global.addr_len);
    seq = global.done = 0;
 
    signal(SIGALRM, sig_alrm);
@@ -101,7 +159,7 @@ void send_loop(int max_ttl){
    sig_alrm(SIGALRM);
 
    for (int ttl = 1; ttl <= max_ttl && global.done == 0; ttl++){
-      bzero(last_addr, sizeof(struct sockaddr));
+      bzero(last_addr, global.addr_len);
       if (global.send_addr->sa_family == AF_INET)
          setsockopt(global.sockfd_send, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
       else 
@@ -116,16 +174,14 @@ void send_loop(int max_ttl){
          pck->ttl = ttl;
          gettimeofday(&pck->time, NULL);
          set_port(global.send_addr, seq + PORT);
+
          ASSERT(sendto(global.sockfd_send, sendbuffer, 
-               sizeof(upd_packet_t), 0, global.send_addr, sizeof(struct sockaddr)));
+               sizeof(upd_packet_t), 0, global.send_addr, global.addr_len));
         
          if (global.send_addr->sa_family == AF_INET)
             code = recv_udp(seq, &time_recv);
-         else {
-            /* TODO: */
-            /* code = recv_udp_v6(seq, &time_recv); */
-            continue;
-         }
+         else 
+            code = recv_udp_v6(seq, &time_recv);
 
          hostname = get_hostname(global.recv_addr);
          ip_str = get_addr_str(global.recv_addr);
@@ -133,7 +189,7 @@ void send_loop(int max_ttl){
          else {
             if (cmp_addr(global.recv_addr, last_addr) != 0){ 
                printf(" %s (%s)", hostname ? hostname : ip_str, ip_str);
-               memcpy(last_addr, global.recv_addr, sizeof(struct sockaddr));
+               memcpy(last_addr, global.recv_addr, global.addr_len);
             }
             time_difference(&time_recv, &pck->time);
             rtt = time_recv.tv_sec * 1000.0 + time_recv.tv_usec / 1000.0;
@@ -172,6 +228,7 @@ void traceroute(char* host, int max_ttl){
    }
    
    datalen = sizeof(upd_packet_t);
+   global.addr_len = addr->ai_addrlen;
    global.send_addr = addr->ai_addr;
    global.bind_addr = calloc(1, addr->ai_addrlen);
    global.recv_addr = calloc(1, addr->ai_addrlen);
@@ -181,15 +238,15 @@ void traceroute(char* host, int max_ttl){
                      addr->ai_canonname ? addr->ai_canonname: host,
                      get_addr_str(addr->ai_addr), global.port, max_ttl, datalen);
   
-   if (addr->ai_flags == AF_INET) init_traceroute_socket_v4();
+   if (addr->ai_family== AF_INET) init_traceroute_socket_v4();
    else                           init_traceroute_socket_v6();
    
-   set_port(global.bind_addr, global.port);
-   setuid(getuid());
 
    global.bind_addr->sa_family = addr->ai_family;
+   set_port(global.bind_addr, global.port);
    ASSERT(bind(global.sockfd_send, global.bind_addr, addr->ai_addrlen));
    
+   setuid(getuid());
    send_loop(max_ttl);
    sig_int(SIGINT);
 }

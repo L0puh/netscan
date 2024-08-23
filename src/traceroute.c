@@ -1,6 +1,7 @@
 #include "netscan.h"
 #include "utils.h"
 
+#include <netinet/icmp6.h>
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/udp.h>
@@ -15,6 +16,7 @@
 #define BUFFER_SIZE 1500
 static struct TRACEROUTE_GLOBAL global;
 
+
 int recv_udp(int seq, struct timeval *time){
    int header_len, icmp_len;
    socklen_t len;
@@ -23,14 +25,22 @@ int recv_udp(int seq, struct timeval *time){
    struct ip *ip, *hip;
    struct udphdr *udp;
    char buffer[BUFFER_SIZE];
+   struct sigaction sigact;
 
+   sigemptyset(&sigact.sa_mask);
+   sigact.sa_handler = sig_alrm;
+   sigact.sa_flags = 0;
+   sigaction(SIGALRM, &sigact, NULL);    
+
+   alarm(WAIT_TIME);
    global.is_alrm = 0;
-   alarm(1);
-   
+ 
    while(1){
       if (global.is_alrm) return -3;
+
       len = sizeof(struct sockaddr);
-      ASSERT((bytes = recvfrom(global.sockfd_recv, buffer, BUFFER_SIZE, 0, global.recv_addr, &len)));
+      ASSERT((bytes = recvfrom(global.sockfd_recv, buffer, 
+                   BUFFER_SIZE, 0, global.recv_addr, &len)));
       
       ip = (struct ip*) buffer;
       header_len = ip->ip_hl << 2;
@@ -66,8 +76,9 @@ int recv_udp(int seq, struct timeval *time){
 
          }
       }
-      printf(" (from %s: type: %d, code: %d)\n", get_hostname(global.recv_addr), icmp->icmp_type,
-            icmp->icmp_code);
+      printf(" (from %s: type: %d, code: %d)\n", get_hostname(global.recv_addr), 
+                                                         icmp->icmp_type,
+                                                         icmp->icmp_code);
    }
    alarm(0);
    gettimeofday(time, NULL);
@@ -76,16 +87,21 @@ int recv_udp(int seq, struct timeval *time){
 
 void send_loop(int max_ttl){
    double rtt;
-   int seq, done, code;
+   int seq, code;
    struct sockaddr* last_addr;
    char sendbuffer[BUFFER_SIZE], *hostname, *ip_str;
    upd_packet_t *pck;
    struct timeval time_recv;
   
    last_addr = calloc(1, sizeof(struct sockaddr));
-   seq = done = 0;
+   seq = global.done = 0;
 
-   for (int ttl = 1; ttl <= max_ttl; ttl++){
+   signal(SIGALRM, sig_alrm);
+   signal(SIGINT,  sig_int);
+   sig_alrm(SIGALRM);
+
+   for (int ttl = 1; ttl <= max_ttl && global.done == 0; ttl++){
+      bzero(last_addr, sizeof(struct sockaddr));
       if (global.send_addr->sa_family == AF_INET)
          setsockopt(global.sockfd_send, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
       else 
@@ -103,11 +119,13 @@ void send_loop(int max_ttl){
          ASSERT(sendto(global.sockfd_send, sendbuffer, 
                sizeof(upd_packet_t), 0, global.send_addr, sizeof(struct sockaddr)));
         
-         /* TODO: */
-         /* if (global.send_addr->sa_family == AF_INET) */
+         if (global.send_addr->sa_family == AF_INET)
             code = recv_udp(seq, &time_recv);
-         /* else */ 
+         else {
+            /* TODO: */
             /* code = recv_udp_v6(seq, &time_recv); */
+            continue;
+         }
 
          hostname = get_hostname(global.recv_addr);
          ip_str = get_addr_str(global.recv_addr);
@@ -120,8 +138,9 @@ void send_loop(int max_ttl){
             time_difference(&time_recv, &pck->time);
             rtt = time_recv.tv_sec * 1000.0 + time_recv.tv_usec / 1000.0;
             printf(" %.3fms", rtt);
-            if (code == -1) done++;
-            /*TODO: else if (code >= 0) printf(" (ICMP %s)", get_icmp_code(code)); */ 
+            if (global.max_time < rtt) global.max_time = rtt;
+            if (code == -1) global.done++;
+            else if (code >= 0) printf(" (ICMP %s)", get_icmp_code(code)); 
          }
 
          fflush(stdout);
@@ -130,6 +149,16 @@ void send_loop(int max_ttl){
    }
 }
 
+char* get_icmp_code(int code){
+   switch(code){
+      case ICMP6_DST_UNREACH_NOROUTE: return "no route";
+      case ICMP6_DST_UNREACH_ADMIN:   return "unreach admin";
+      case ICMP6_DST_UNREACH_ADDR:    return "unreach addr";
+      case ICMP6_DST_UNREACH_NOPORT:  return "unreach port";
+      default: return "unknown code";
+   }
+
+}
 void traceroute(char* host, int max_ttl){
    int datalen;
    struct addrinfo* addr; 
@@ -155,15 +184,14 @@ void traceroute(char* host, int max_ttl){
    if (addr->ai_flags == AF_INET) init_traceroute_socket_v4();
    else                           init_traceroute_socket_v6();
    
-   signal(SIGALRM, trace_alrm);
    set_port(global.bind_addr, global.port);
    setuid(getuid());
 
    global.bind_addr->sa_family = addr->ai_family;
    ASSERT(bind(global.sockfd_send, global.bind_addr, addr->ai_addrlen));
    
-   trace_alrm(SIGALRM);
    send_loop(max_ttl);
+   sig_int(SIGINT);
 }
 
 void init_traceroute_socket_v4(){
@@ -183,7 +211,12 @@ void init_traceroute_socket_v6(){
                                     &filter, sizeof(filter));
 }
 
-void trace_alrm(int signo){
+void sig_alrm(int signo){
    global.is_alrm = 1;
    return;
+}
+void sig_int(int signo){
+   printf("\ndone: %d, max time: %.2fms\n", global.done, global.max_time);
+
+   exit(0);
 }

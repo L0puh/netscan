@@ -7,6 +7,7 @@
 
 void log_error(const char* file, int line, const char* function){
    if (errno != 0){
+      if (errno == EINTR) return;
       printf("[-] ERROR (%s: %s [%d]): %s\n", file, function, line, strerror(errno)); 
       exit(-1);
    } else {

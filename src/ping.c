@@ -71,26 +71,26 @@ void ping(char* host){
                addr->ai_canonname ? addr->ai_canonname: host, 
                get_addr_str(addr->ai_addr), DATALEN);
 
-   signal(SIGALRM, ping_alrm);
-   signal(SIGINT, ping_termination);
+   signal(SIGALRM, sig_alrm);
+   signal(SIGINT, sig_int);
    global.pid = getpid() & 0xffff;
    global.sockfd = sockfd;
    global.addr = addr;
    global.received_packets = 0;
    global.sent_packets = 0;
    recv_packet(sockfd);
-   ping_alrm(SIGALRM);
+   sig_alrm(SIGALRM);
    
    return;
 }
 
-void ping_termination(int signo){
+void sig_int(int signo){
    printf("\nstatistics:\n\tsent: %d;\n\treceived: %d\n\t%.2f%% lost\n", global.sent_packets, global.received_packets,
             ((float)(global.sent_packets-global.received_packets)/global.sent_packets)*100.f);
    exit(0);
 }
 
-void ping_alrm(int signo){
+void sig_alrm(int signo){
    if (global.addr->ai_family == AF_INET)
       send_packet_v4(global.sockfd, global.addr);
    else 
@@ -196,7 +196,7 @@ void recv_packet(int sockfd){
    struct sockaddr_storage addr;
    char recvbuff[PACKET_SIZE], controlbuff[PACKET_SIZE];
 
-   ping_alrm(SIGALRM);
+   sig_alrm(SIGALRM);
 
    iov.iov_base = recvbuff;
    iov.iov_len = sizeof(recvbuff);

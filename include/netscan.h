@@ -40,6 +40,9 @@ struct TRACEROUTE_GLOBAL {
    struct sockaddr* send_addr;
    struct sockaddr* recv_addr;
    struct sockaddr* bind_addr;
+   
+   int done;
+   double max_time;
 };
 
 typedef struct {
@@ -62,6 +65,9 @@ struct addrinfo* get_addr_by_name(const char* name);
 void set_port(struct sockaddr* addr, int port);
 int cmp_addr(struct sockaddr* x, struct sockaddr* y);
 
+static void sig_alrm(int signo);
+static void sig_int(int signo);
+
 /****************** PING ***************************/
 
 void ping(char* host);
@@ -78,8 +84,6 @@ void send_packet_v4(int sockfd, struct addrinfo *addr);
 int  process_packet_v4(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr);
 int  process_packet_v6(char *buffer, int len, struct timeval*, struct sockaddr*, struct msghdr*);
 
-void ping_alrm(int signo);
-void ping_termination(int signo);
 
 unsigned short get_checksum(unsigned short *data, size_t len);
 
@@ -92,6 +96,6 @@ void traceroute(char* host, int max_ttl);
 void init_traceroute_socket_v4();
 void init_traceroute_socket_v6();
 
-void trace_alrm(int signo);
+char* get_icmp_code(int code);
 
 #endif

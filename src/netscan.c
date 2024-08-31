@@ -26,11 +26,10 @@ int get_ip_version(const char* host){
    return AF_INET;
 }
 
-int search_ports(int start, int end, struct sockaddr_in server_addr, int *ports, pthread_mutex_t *mtx){
-   int len, sockfd;
+void search_ports(int *len, int start, int end, struct sockaddr_in server_addr, int *ports, pthread_mutex_t *mtx){
+   int sockfd;
    struct timeval timeout;
    
-   len = 0;
    for (int i = start; i <= end; i++){
       server_addr.sin_port = htons(i);
 
@@ -42,12 +41,12 @@ int search_ports(int start, int end, struct sockaddr_in server_addr, int *ports,
       ASSERT(sockfd);
       if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
          pthread_mutex_lock(mtx); 
-         ports[len++] = i;
+         ports[*len] = i;
+         *len = *len+1;
          pthread_mutex_unlock(mtx);
       } 
       close(sockfd);
    }
-   return len;
 }
 
 typedef struct {
@@ -55,22 +54,16 @@ typedef struct {
    int end;
    int start;
    
-   int len;
+   int *len;
    int *ports;
    pthread_mutex_t *mtx;
    struct sockaddr_in serv;
 } ports_param_t;
 
 void* handle_thread(void* param){
-   int ret; 
    ports_param_t *p = (ports_param_t*)param;
    
-   ret = search_ports(p->start, p->end, p->serv, p->ports, p->mtx);
-
-   pthread_mutex_lock(p->mtx); 
-   p->len += ret;
-   pthread_mutex_unlock(p->mtx); 
-   
+   search_ports(p->len, p->start, p->end, p->serv, p->ports, p->mtx);
    log_infoi(p->id, "is done");
    pthread_exit(NULL);
 }
@@ -101,14 +94,18 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
    } else if ((host = gethostbyname(ip)) != 0){
       strncpy((char*)&server_addr.sin_addr, (char*)host->h_addr, sizeof server_addr.sin_addr);
    }
-    
+   
+   len = 0;
    pthread_mutex_init(&mtx, 0);
    p1.id = 1;
-   p1.len = 0;
+   p1.len = &len;
+
+   //TODO:
    p1.start = 80; 
    p1.end = 85;
+   
    p1.mtx = &mtx;
-   p1.ports = ports; // <- FIXME
+   p1.ports = ports; 
    p1.serv = server_addr;
 
    p2 = p3 = p1;
@@ -120,15 +117,15 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
    pthread_create(&ptr2, NULL, handle_thread, (void*)&p2);
 
    p3.id = 3;
-   p3.start = 440;
-   p3.end= 445;
+   p3.start = 1440;
+   p3.end= 1445;
    pthread_create(&ptr3, NULL, handle_thread, (void*)&p3);
    
    pthread_join(ptr, NULL);
    pthread_join(ptr2, NULL);
    pthread_join(ptr3, NULL);
    
-   return p1.len + p2.len + p3.len;
+   return *(p1.len);
 }
 
 

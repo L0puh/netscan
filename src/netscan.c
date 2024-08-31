@@ -1,6 +1,7 @@
 #include "netscan.h"
 #include "utils.h"
 
+#include <bits/pthreadtypes.h>
 #include <ctype.h>
 #include <netdb.h>
 #include <unistd.h>
@@ -16,6 +17,7 @@
 #include <string.h>
 #include <limits.h>
 #include <errno.h>
+#include <pthread.h>
 
 int get_ip_version(const char* host){
    unsigned char buf[sizeof(struct in6_addr)];
@@ -24,7 +26,59 @@ int get_ip_version(const char* host){
    return AF_INET;
 }
 
+int search_ports(int start, int end, struct sockaddr_in server_addr, int *ports, pthread_mutex_t *mtx){
+   int len, sockfd;
+   struct timeval timeout;
+   
+   len = 0;
+   for (int i = start; i <= end; i++){
+      server_addr.sin_port = htons(i);
+
+      sockfd = socket(AF_INET, SOCK_STREAM, 0);
+      timeout.tv_sec = 1; timeout.tv_usec = 0;
+      setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+      setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+      ASSERT(sockfd);
+      if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
+         pthread_mutex_lock(mtx); 
+         ports[len++] = i;
+         pthread_mutex_unlock(mtx);
+      } 
+      close(sockfd);
+   }
+   return len;
+}
+
+typedef struct {
+   int id;
+   int end;
+   int start;
+   
+   int len;
+   int *ports;
+   pthread_mutex_t *mtx;
+   struct sockaddr_in serv;
+} ports_param_t;
+
+void* handle_thread(void* param){
+   int ret; 
+   ports_param_t *p = (ports_param_t*)param;
+   
+   ret = search_ports(p->start, p->end, p->serv, p->ports, p->mtx);
+
+   pthread_mutex_lock(p->mtx); 
+   p->len += ret;
+   pthread_mutex_unlock(p->mtx); 
+   
+   log_infoi(p->id, "is done");
+   pthread_exit(NULL);
+}
 int get_open_ports(const char* ip, int start, int end, int *ports){
+
+   pthread_t ptr, ptr2, ptr3;
+   ports_param_t p1, p2, p3;
+   pthread_mutex_t mtx;
    struct timeval timeout;
    struct hostent *host;
    struct sockaddr_in server_addr;
@@ -47,23 +101,34 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
    } else if ((host = gethostbyname(ip)) != 0){
       strncpy((char*)&server_addr.sin_addr, (char*)host->h_addr, sizeof server_addr.sin_addr);
    }
+    
+   pthread_mutex_init(&mtx, 0);
+   p1.id = 1;
+   p1.len = 0;
+   p1.start = 80; 
+   p1.end = 85;
+   p1.mtx = &mtx;
+   p1.ports = ports; // <- FIXME
+   p1.serv = server_addr;
 
-   len = 0;
-   for (int i = start; i <= end; i++){
-      server_addr.sin_port = htons(i);
+   p2 = p3 = p1;
+   pthread_create(&ptr, NULL, handle_thread, (void*)&p1);
+   
+   p2.id = 2;
+   p2.start = 440;
+   p2.end= 445;
+   pthread_create(&ptr2, NULL, handle_thread, (void*)&p2);
 
-      sockfd = socket(AF_INET, SOCK_STREAM, 0);
-      timeout.tv_sec = 1; timeout.tv_usec = 0;
-      setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
-      setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-
-      ASSERT(sockfd);
-      if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
-         ports[len++] = i;
-      }
-      close(sockfd);
-   }
-   return len; 
+   p3.id = 3;
+   p3.start = 440;
+   p3.end= 445;
+   pthread_create(&ptr3, NULL, handle_thread, (void*)&p3);
+   
+   pthread_join(ptr, NULL);
+   pthread_join(ptr2, NULL);
+   pthread_join(ptr3, NULL);
+   
+   return p1.len + p2.len + p3.len;
 }
 
 

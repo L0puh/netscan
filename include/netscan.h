@@ -1,7 +1,6 @@
 #ifndef NETSCAN_H
 #define NETSCAN_H
 
-
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -28,7 +27,6 @@ struct PING_GLOBAL{
    struct addrinfo* addr;
    int sockfd;
 };
-
 
 struct TRACEROUTE_GLOBAL {
    int port;
@@ -86,10 +84,7 @@ void send_packet_v4(int sockfd, struct addrinfo *addr);
 int  process_packet_v4(char *buffer, int len, struct timeval* recv_time, struct sockaddr *from_addr);
 int  process_packet_v6(char *buffer, int len, struct timeval*, struct sockaddr*, struct msghdr*);
 
-
 unsigned short get_checksum(unsigned short *data, size_t len);
-
-
 
 /****************** TRACEROUTE ***************************/
 

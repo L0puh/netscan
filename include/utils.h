@@ -5,5 +5,6 @@
 
 void log_error(const char* file, int line, const char* function);
 void log_info(const char* where, const char* what);
+void log_infoi(int line, const char* what);
 
 #endif

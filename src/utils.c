@@ -18,3 +18,6 @@ void log_error(const char* file, int line, const char* function){
 void log_info(const char* where, const char* what){
    printf("[+] INFO (%s): %s\n", where, what);
 }
+void log_infoi(int line, const char* what){
+   printf("[+] INFO %d: %s\n", line, what);
+}

@@ -48,16 +48,6 @@ void search_ports(int *len, int start, int end, struct sockaddr_in server_addr, 
    }
 }
 
-typedef struct {
-   int id;
-   int end;
-   int start;
-   
-   int *len;
-   int *ports;
-   pthread_mutex_t *mtx;
-   struct sockaddr_in serv;
-} ports_param_t;
 
 void* handle_thread(void* param){
    ports_param_t *p = (ports_param_t*)param;
@@ -65,10 +55,11 @@ void* handle_thread(void* param){
    search_ports(p->len, p->start, p->end, p->serv, p->ports, p->mtx);
    pthread_exit(NULL);
 }
+
 int get_open_ports(const char* ip, int start, int end, int *ports){
 
-   pthread_t ptr, ptr2, ptr3;
-   ports_param_t p1, p2, p3;
+   pthread_t threads[MAX_THREADS];
+   ports_param_t params[MAX_THREADS];
    pthread_mutex_t mtx;
    struct timeval timeout;
    struct hostent *host;
@@ -92,38 +83,37 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
    } else if ((host = gethostbyname(ip)) != 0){
       strncpy((char*)&server_addr.sin_addr, (char*)host->h_addr, sizeof server_addr.sin_addr);
    }
-  
+ 
    len = 0;
    pthread_mutex_init(&mtx, 0);
-   p1.id = 1;
-   p1.len = &len;
-
-   p1.start = start;
-   p1.end = start + (end-start)/3;
    
-   p1.mtx = &mtx;
-   p1.ports = ports; 
-   p1.serv = server_addr;
+   params[0].id = 1;
+   params[0].len = &len;
+   params[0].mtx = &mtx;
+   params[0].ports = ports;
+   params[0].serv = server_addr;
 
-   p2 = p3 = p1;
-   pthread_create(&ptr, NULL, handle_thread, (void*)&p1);
-   p2.id = 2;
-   p2.start = p1.end+1;
-   p2.end= p2.start + (end-start)/3;
-   pthread_create(&ptr2, NULL, handle_thread, (void*)&p2);
+   for (int i = 0; i < MAX_THREADS; i++){
+      if (i == 0){
+         params[0].start = start;
+         params[0].end = start + (end-start)/MAX_THREADS;
+      } else {
+         params[i] = params[0];
+         params[i].id = i+1;
+         params[i].start = params[i-1].end+1;
+         params[i].end = params[i].start + (end-start)/MAX_THREADS;
+      }
+      if (i == MAX_THREADS-1) {
+         if ((end-start) % MAX_THREADS != 0) params[i].end+=1;
+         if (params[i].end > end) params[i].end = params[i].end - (params[i].end - end);
+      }
+      pthread_create(&threads[i], NULL, handle_thread, (void*)&params[i]);
+   }
+   printf("[+] begin searching...\n\tthreads working: %d\n\tports to scan: %d\n", MAX_THREADS, end-start);
+   for (int i = 0; i < MAX_THREADS; i++)
+      pthread_join(threads[i], NULL);
 
-   p3.id = 3;
-   p3.start = p2.end+1;
-   p3.end = p3.start + (end-start)/3;
-   if ((end-start) % 3 != 0) p3.end+=1;
-   if (p3.end > end) p3.end = p3.end - (p3.end - end);
-   pthread_create(&ptr3, NULL, handle_thread, (void*)&p3);
-   
-   pthread_join(ptr, NULL);
-   pthread_join(ptr2, NULL);
-   pthread_join(ptr3, NULL);
-   
-   return *(p1.len);
+   return *(params[0].len);
 }
 
 

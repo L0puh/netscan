@@ -19,6 +19,7 @@
 #define PORT 30000
 #define MAX_PROBES 3
 #define MAX_IPS 40
+#define MAX_THREADS 5
 
 struct PING_GLOBAL{
    int received_packets;
@@ -51,6 +52,16 @@ typedef struct {
    struct timeval time;
 } upd_packet_t;
 
+typedef struct {
+   int id;
+   int end;
+   int start;
+   
+   int *len;
+   int *ports;
+   pthread_mutex_t *mtx;
+   struct sockaddr_in serv;
+} ports_param_t;
 
 /****************** NETSCAN ***************************/
 
@@ -67,6 +78,9 @@ int cmp_addr(struct sockaddr* x, struct sockaddr* y);
 
 static void sig_alrm(int signo);
 static void sig_int(int signo);
+
+void* handle_thread(void* param);
+void search_ports(int *len, int start, int end, struct sockaddr_in server_addr, int *ports, pthread_mutex_t *mtx);
 
 /****************** PING ***************************/
 

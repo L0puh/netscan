@@ -1,7 +1,6 @@
 #include "netscan.h"
 #include "utils.h"
 
-#include <bits/pthreadtypes.h>
 #include <ctype.h>
 #include <netdb.h>
 #include <unistd.h>
@@ -64,7 +63,6 @@ void* handle_thread(void* param){
    ports_param_t *p = (ports_param_t*)param;
    
    search_ports(p->len, p->start, p->end, p->serv, p->ports, p->mtx);
-   log_infoi(p->id, "is done");
    pthread_exit(NULL);
 }
 int get_open_ports(const char* ip, int start, int end, int *ports){
@@ -94,15 +92,14 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
    } else if ((host = gethostbyname(ip)) != 0){
       strncpy((char*)&server_addr.sin_addr, (char*)host->h_addr, sizeof server_addr.sin_addr);
    }
-   
+  
    len = 0;
    pthread_mutex_init(&mtx, 0);
    p1.id = 1;
    p1.len = &len;
 
-   //TODO:
-   p1.start = 80; 
-   p1.end = 85;
+   p1.start = start;
+   p1.end = start + (end-start)/3;
    
    p1.mtx = &mtx;
    p1.ports = ports; 
@@ -110,15 +107,16 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
 
    p2 = p3 = p1;
    pthread_create(&ptr, NULL, handle_thread, (void*)&p1);
-   
    p2.id = 2;
-   p2.start = 440;
-   p2.end= 445;
+   p2.start = p1.end+1;
+   p2.end= p2.start + (end-start)/3;
    pthread_create(&ptr2, NULL, handle_thread, (void*)&p2);
 
    p3.id = 3;
-   p3.start = 1440;
-   p3.end= 1445;
+   p3.start = p2.end+1;
+   p3.end = p3.start + (end-start)/3;
+   if ((end-start) % 3 != 0) p3.end+=1;
+   if (p3.end > end) p3.end = p3.end - (p3.end - end);
    pthread_create(&ptr3, NULL, handle_thread, (void*)&p3);
    
    pthread_join(ptr, NULL);

@@ -7,8 +7,8 @@
 void print_usage(char* argv);
 
 int main(int argc, char* argv[]) {
-   int opt, ip_size, start, end, len;
    char *name, *hostname, *IPs[MAX_IPS];;
+   int opt, ip_size, start, end, len, threads;
    
    if (argc == 1) print_usage(argv[0]);
 
@@ -22,17 +22,18 @@ int main(int argc, char* argv[]) {
             }
          case 'o':
             {
-               if (optind+1 < argc){
+               if (optind+2 < argc){
                   hostname = optarg;
                   start = atoi(argv[optind]);
                   end = atoi(argv[optind+1]);
+                  threads = atoi(argv[optind+2]);
                } else {
-                  fprintf(stderr, "usage: %s -o [hostname] [start port] [end port]\n", argv[0]);
+                  fprintf(stderr, "usage: %s -o [hostname] [start port] [end port] [threads] \n", argv[0]);
                   return -1;
                }
-               
+               if (threads == 0) threads = DEFAULT_THREADS;
                int ports[end-start+1];
-               len = get_open_ports(hostname, start, end, ports);
+               len = get_open_ports(hostname, start, end, ports, threads);
                if (len <= 0) 
                   log_info("get open ports", "no open ports were found\n");
                else {

@@ -19,7 +19,7 @@
 #define PORT 30000
 #define MAX_PROBES 3
 #define MAX_IPS 40
-#define MAX_THREADS 5
+#define DEFAULT_THREADS 5
 
 struct PING_GLOBAL{
    int received_packets;
@@ -66,7 +66,7 @@ typedef struct {
 /****************** NETSCAN ***************************/
 
 int   get_ip_version(const char* host);
-int   get_open_ports(const char* ip, int start, int end, int *ports);
+int   get_open_ports(const char* ip, int start, int end, int *ports, int threads);
 char* get_ips_by_name(const char* name, char* IPs[], int *IPs_size);
 char* get_hostname(struct sockaddr* in_addr);
 char* get_addr_str(struct sockaddr* in_addr);

@@ -3,5 +3,5 @@ network utilities.
 current features:
 - ping a host 
 - traceroute 
-- open port scanning 
+- concurrent open port scanning (using threads)
 - list IP addresses of a host 

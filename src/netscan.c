@@ -25,8 +25,10 @@ int get_ip_version(const char* host){
    return AF_INET;
 }
 
-void search_ports(int *len, int start, int end, struct sockaddr_in server_addr, int *ports, pthread_mutex_t *mtx){
-   int sockfd;
+void search_ports
+(int *len, int start, int end, struct sockaddr_in server_addr, int *ports, pthread_mutex_t *mtx)
+{
+   int sockfd, ret;
    struct timeval timeout;
    
    for (int i = start; i <= end; i++){
@@ -38,16 +40,29 @@ void search_ports(int *len, int start, int end, struct sockaddr_in server_addr, 
       setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
       ASSERT(sockfd);
-      if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == 0) {
-         pthread_mutex_lock(mtx); 
-         ports[*len] = i;
-         *len = *len+1;
-         pthread_mutex_unlock(mtx);
-      } 
+      ret = connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+      switch(ret){
+         case 0: 
+            {
+               pthread_mutex_lock(mtx); 
+               ports[*len] = i;
+               *len = *len+1;
+               pthread_mutex_unlock(mtx);
+               break;
+            }
+         case ETIMEDOUT: 
+               printf("\t%d is filtered (failed due timeout)\n", i);
+               break;
+               
+         default:
+#ifdef VERBOSE
+            printf("\t%d is closed\n", i);
+#endif 
+               break;
+         }
       close(sockfd);
    }
 }
-
 
 void* handle_thread(void* param){
    ports_param_t *p = (ports_param_t*)param;
@@ -56,10 +71,10 @@ void* handle_thread(void* param){
    pthread_exit(NULL);
 }
 
-int get_open_ports(const char* ip, int start, int end, int *ports){
+int get_open_ports(const char* ip, int start, int end, int *ports, int cnt_threads){
 
-   pthread_t threads[MAX_THREADS];
-   ports_param_t params[MAX_THREADS];
+   pthread_t threads[cnt_threads];
+   ports_param_t params[cnt_threads];
    pthread_mutex_t mtx;
    struct timeval timeout;
    struct hostent *host;
@@ -93,24 +108,24 @@ int get_open_ports(const char* ip, int start, int end, int *ports){
    params[0].ports = ports;
    params[0].serv = server_addr;
 
-   for (int i = 0; i < MAX_THREADS; i++){
+   for (int i = 0; i < cnt_threads; i++){
       if (i == 0){
          params[0].start = start;
-         params[0].end = start + (end-start)/MAX_THREADS;
+         params[0].end = start + (end-start)/cnt_threads;
       } else {
          params[i] = params[0];
          params[i].id = i+1;
          params[i].start = params[i-1].end+1;
-         params[i].end = params[i].start + (end-start)/MAX_THREADS;
+         params[i].end = params[i].start + (end-start)/cnt_threads;
       }
-      if (i == MAX_THREADS-1) {
-         if ((end-start) % MAX_THREADS != 0) params[i].end+=1;
+      if (i == cnt_threads-1) {
+         if ((end-start) % cnt_threads != 0) params[i].end+=1;
          if (params[i].end > end) params[i].end = params[i].end - (params[i].end - end);
       }
       pthread_create(&threads[i], NULL, handle_thread, (void*)&params[i]);
    }
-   printf("[+] begin searching...\n\tthreads working: %d\n\tports to scan: %d\n", MAX_THREADS, end-start);
-   for (int i = 0; i < MAX_THREADS; i++)
+   printf("[+] begin searching...\n\tthreads working: %d\n\tports to scan: %d\n", cnt_threads, end-start);
+   for (int i = 0; i < cnt_threads; i++)
       pthread_join(threads[i], NULL);
 
    return *(params[0].len);

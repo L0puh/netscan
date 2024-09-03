@@ -14,6 +14,7 @@
 #define DATALEN 56
 #define PACKETS_COUNT 5
 #define PACKET_SIZE 4096 /* ping packet */
+#define TOTAL_SIZE 65536 /* buffer for packet in sniffer */ 
 #define BUFFER_SIZE 1500 /* traceroute packet */
 #define WAIT_TIME 1
 #define PORT 30000
@@ -27,6 +28,18 @@ struct PING_GLOBAL{
    pid_t pid;
    struct addrinfo* addr;
    int sockfd;
+};
+
+struct SNIFFER_GLOBAL {
+   int rcv_count;
+   int total_size;
+   int max_size;
+   int count_tcp;
+   int count_icmp;
+   int count_igmp;
+   int count_udp;
+   int count_other;
+   struct timeval time;
 };
 
 struct TRACEROUTE_GLOBAL {
@@ -112,5 +125,11 @@ void send_loop(int max_ttl);
 
 int recv_udp_v6(int seq, struct timeval *time);
 int recv_udp(int seq, struct timeval *time);
+
+
+
+/****************** PACKET SNIFFER ***************************/
+
+void packet_sniffer(int proto);
 
 #endif

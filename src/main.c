@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
    
    if (argc == 1) print_usage(argv[0]);
 
-   while((opt = getopt(argc, argv, "p:o:l:t:")) != -1){
+   while((opt = getopt(argc, argv, "p:o:l:t:s")) != -1){
       switch(opt){
          case 'p':
             {
@@ -70,6 +70,12 @@ int main(int argc, char* argv[]) {
                traceroute(hostname, max_ttl);
                break;
             }
+         case 's':
+            {
+               packet_sniffer(AF_INET);
+               break;
+            }
+
          default:
             print_usage(argv[0]);
       }
@@ -80,9 +86,10 @@ int main(int argc, char* argv[]) {
 
 void print_usage(char* argv){
    fprintf(stderr, "usage:\n\
-      -p [hostname]                        - ping hostname\n\
-      -o [hostname] [start] [end]          - scan open ports\n\
-      -l [hostname]                        - list available IPs\n\
-      -t [hostname] [max ttl (default 30)] - traceroute\n\n\
+      -p [hostname]                          - ping hostname\n\
+      -o [hostname] [start] [end] [threads]  - scan open ports\n\
+      -l [hostname]                          - list available IPs\n\
+      -s                                     - packet sniffer\n\
+      -t [hostname] [max ttl (default 30)]   - traceroute\n\n\
    example: %s -o google.com 75 90\n", argv);
 }

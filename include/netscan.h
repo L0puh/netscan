@@ -131,5 +131,9 @@ int recv_udp(int seq, struct timeval *time);
 /****************** PACKET SNIFFER ***************************/
 
 void packet_sniffer(int proto);
+void process_packet(unsigned char* buffer, int buffer_len);
+
+void print_dump(unsigned char* data, int len);
+void print_tcp(struct iphdr* hdr, unsigned char* buffer, int buff_len);
 
 #endif

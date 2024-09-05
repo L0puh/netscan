@@ -1,6 +1,7 @@
 #include "netscan.h"
 #include "utils.h"
 #include <netinet/ip.h>
+#include <netinet/udp.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +10,7 @@
 #include <unistd.h>
 
 static struct SNIFFER_GLOBAL global;
+
 
 
 void print_dump(unsigned char* data, int len){
@@ -23,17 +25,18 @@ void print_dump(unsigned char* data, int len){
             else printf(".");
          }
          printf("\n");
-         
       }
       if (i % 16 == 0) printf("\t");
       printf(" %02x", (unsigned int)data[i]);
-   }
 
-   printf("\t");
-   for (j = i-i%16; j <= i; j++){
-      if (data[j] >= 32 && data[j] <= 128)
-         printf("%c", (unsigned char)data[j]);
-      else printf(".");
+      if (i == len-1){
+         printf("\t");
+         for (j = i-i%16; j <= i; j++){
+            if (data[j] >= 32 && data[j] <= 128)
+               printf("%c", (unsigned char)data[j]);
+            else printf(".");
+         }
+      }
    }
    puts("\n\n");
 }
@@ -55,12 +58,28 @@ void print_tcp(struct iphdr* hdr, unsigned char* buffer, int buff_len){
  
    printf("IP HEADER:\n");  print_dump(buffer, len);
    printf("TCP HEADER:\n"); print_dump(buffer+len, bytes);
-   printf("DATA:\n");       print_dump(buffer+len+bytes, (buff_len-bytes-(hdr->ihl*4)));
+   printf("DATA:\n");       print_dump(buffer+len+bytes, (buff_len-bytes-len));
    printf("HEADER LENGTH: %u dwords (%u bytes)\n", tcp->doff, bytes*2);
 
 }
 
-void process_packet(unsigned char* buffer, int buffer_len){
+void print_udp(struct iphdr* hdr, unsigned char* buffer, int buff_len){
+   int len, size;
+
+   len = hdr->ihl * 4;
+   struct udphdr* udp = (struct udphdr*)(buffer+len);
+   size = sizeof(*udp);
+
+   printf("UDP PACKET:\n");
+   printf("\tsource port: %u | destination port: %u\n", ntohs(udp->source), ntohs(udp->dest));
+   printf("\tlen: %u checksum: %u\n", ntohs(udp->len), ntohs(udp->check));
+   printf("IP HEADER:\n");  print_dump(buffer, len);
+   printf("UDP HEADER:\n"); print_dump(buffer+len, size);
+   printf("DATA:\n");       print_dump(buffer+len+size, (buff_len-size-len));
+
+}
+
+void process_packet(unsigned char* buffer, int buffer_len, int flags){
    struct iphdr *hdr;
    hdr = (struct iphdr*) buffer;
    switch(hdr->protocol){
@@ -72,11 +91,13 @@ void process_packet(unsigned char* buffer, int buffer_len){
          break;
       case IPPROTO_TCP:
          global.count_tcp++;
+         if (flags & UDP_ONLY || !(flags & VERBOSE)) break;
          print_tcp(hdr, buffer, buffer_len);
          break;
       case IPPROTO_UDP:
          global.count_udp++;
-         /* print_udp(); */
+         if (flags & TCP_ONLY || !(flags & VERBOSE)) break;
+         print_udp(hdr, buffer, buffer_len);
          break;
       default:
          global.count_other++;
@@ -96,7 +117,7 @@ void sig_int(int signo){
    exit(0);
 }
 
-void packet_sniffer(int proto){
+void packet_sniffer(int proto, int flags){
    int sockfd, bytes;
    char *hostname, *str_ip;
    socklen_t addr_size;
@@ -122,11 +143,18 @@ void packet_sniffer(int proto){
       ASSERT(bytes);
       hostname = get_hostname((struct sockaddr*)&addr);
       str_ip = get_addr_str((struct sockaddr*)&addr);
-      printf("\nReceived a packet from %s (%s), total size: %d\n", hostname ? hostname: str_ip, str_ip, bytes);
+
+      if (flags & SKIP_LOCALHOST){
+         if (hostname != NULL)
+            if (strcmp(hostname, "localhost") == 0) continue;
+         if (strcmp(str_ip, "127.0.0.1") == 0) continue; //FIXME
+      }
+
+      printf("## Received a packet from %s (%s), total size: %d\n", hostname ? hostname: str_ip, str_ip, bytes);
       global.rcv_count++;
       global.total_size += bytes;
       if (global.max_size < bytes) global.max_size = bytes;
-      process_packet(buffer, bytes);
+      process_packet(buffer, bytes, flags);
    }
    
    close(sockfd);

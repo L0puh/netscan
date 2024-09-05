@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
    
    if (argc == 1) print_usage(argv[0]);
 
-   while((opt = getopt(argc, argv, "p:o:l:t:s")) != -1){
+   while((opt = getopt(argc, argv, "p:o:l:t:s:")) != -1){
       switch(opt){
          case 'p':
             {
@@ -72,7 +72,24 @@ int main(int argc, char* argv[]) {
             }
          case 's':
             {
-               packet_sniffer(AF_INET);
+               int proto = AF_INET;
+               int flags = 0;
+               if (strcmp(optarg, "v6") == 0) proto = AF_INET6;
+               else if (strcmp(optarg, "v4") == 0) proto = AF_INET;
+               else {
+                  printf("unknown option\n"); break;
+               }
+               if (optind < argc){
+                  if (strcmp(argv[optind], "tcp") == 0) flags |= TCP_ONLY;
+                  else if (strcmp(argv[optind], "udp") == 0) flags |= UDP_ONLY;
+                  if (optind+1 < argc)
+                     if (strcmp(argv[optind+1], "-v") == 0) flags |= VERBOSE;
+               }
+               char n;
+               printf("skip localhost packets? [Y/n]: ");
+               scanf("%c", &n);
+               if (n == 'y' || n == 'Y') flags |= SKIP_LOCALHOST;
+               packet_sniffer(proto, flags);
                break;
             }
 
@@ -89,7 +106,7 @@ void print_usage(char* argv){
       -p [hostname]                          - ping hostname\n\
       -o [hostname] [start] [end] [threads]  - scan open ports\n\
       -l [hostname]                          - list available IPs\n\
-      -s                                     - packet sniffer\n\
+      -s [v6/v4] [udp/tcp] [verbose (-v)]    - packet sniffer\n\
       -t [hostname] [max ttl (default 30)]   - traceroute\n\n\
-   example: %s -o google.com 75 90\n", argv);
+   example: %s -o google.com 75 90\n%s -s v4 all -v\n", argv, argv);
 }

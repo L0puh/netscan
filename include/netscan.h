@@ -22,6 +22,12 @@
 #define MAX_IPS 40
 #define DEFAULT_THREADS 5
 
+#define SKIP_LOCALHOST 1<<0
+#define TCP_ONLY 1<<1
+#define UDP_ONLY 1<<2
+#define VERBOSE 1<<3
+
+
 struct PING_GLOBAL{
    int received_packets;
    int sent_packets;
@@ -130,10 +136,11 @@ int recv_udp(int seq, struct timeval *time);
 
 /****************** PACKET SNIFFER ***************************/
 
-void packet_sniffer(int proto);
-void process_packet(unsigned char* buffer, int buffer_len);
+void packet_sniffer(int proto, int flags);
+void process_packet(unsigned char* buffer, int buffer_len, int flags);
 
 void print_dump(unsigned char* data, int len);
 void print_tcp(struct iphdr* hdr, unsigned char* buffer, int buff_len);
+void print_udp(struct iphdr* hdr, unsigned char* buffer, int buff_len);
 
 #endif

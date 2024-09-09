@@ -79,12 +79,33 @@ void print_udp(struct iphdr* hdr, unsigned char* buffer, int buff_len){
 
 }
 
+void print_icmp(struct iphdr* hdr, unsigned char* buffer, int buff_len){
+   int len, size;
+   len = hdr->ihl * 4;
+   
+   struct icmp* icmp = (struct icmp*)(buffer + len);
+   size = sizeof(*icmp);
+
+   printf("ICMP PACKET:\n");
+   printf("\tchecksum: %u, code: %u, type: %u\n", 
+                        ntohs(icmp->icmp_cksum), 
+                        ntohs(icmp->icmp_code), 
+                        ntohs(icmp->icmp_type));
+
+   printf("IP HEADER:\n");  print_dump(buffer, len);
+   printf("UDP HEADER:\n"); print_dump(buffer+len, size);
+   printf("DATA:\n");       print_dump(buffer+len+size, (buff_len-size-len));
+
+}
+
 void process_packet(unsigned char* buffer, int buffer_len, int flags){
    struct iphdr *hdr;
    hdr = (struct iphdr*) buffer;
    switch(hdr->protocol){
       case IPPROTO_ICMP:
          global.count_icmp++;
+         if (flags & UDP_ONLY || flags & TCP_ONLY || !(flags & VERBOSE)) break;
+         print_icmp(hdr, buffer, buffer_len);
          break;
       case IPPROTO_IGMP:
          global.count_igmp++;

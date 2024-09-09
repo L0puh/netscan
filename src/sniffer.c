@@ -11,8 +11,6 @@
 
 static struct SNIFFER_GLOBAL global;
 
-
-
 void print_dump(unsigned char* data, int len){
    int i, j;
 
@@ -125,7 +123,6 @@ void process_packet(unsigned char* buffer, int buffer_len, int flags){
    }
 }
 
-
 void sig_int(int signo){
    struct timeval time;
    
@@ -145,15 +142,11 @@ void packet_sniffer(int proto, int flags){
    struct sockaddr_in addr;
    unsigned char buffer[TOTAL_SIZE];
 
-   if (proto == AF_INET6){
-      log_info(__func__, "IPv6 isn't supported yet");
-      return;
-   }      
   
    global.rcv_count = global.max_size = global.total_size = 0;
    gettimeofday(&global.time, NULL);
 
-   sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+   sockfd = socket(proto, SOCK_RAW, IPPROTO_TCP);
    setuid(getuid());
 
    signal(SIGINT, sig_int);

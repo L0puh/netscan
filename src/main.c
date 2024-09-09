@@ -12,8 +12,13 @@ int main(int argc, char* argv[]) {
    
    if (argc == 1) print_usage(argv[0]);
 
-   while((opt = getopt(argc, argv, "p:o:l:t:s:")) != -1){
+   while((opt = getopt(argc, argv, "p:o:l:t:s:i:")) != -1){
       switch(opt){
+         case 'i':
+            {
+               ipinfo(optarg);
+               break;
+            }
          case 'p':
             {
                hostname = optarg;
@@ -107,6 +112,7 @@ void print_usage(char* argv){
       -o [hostname] [start] [end] [threads]  - scan open ports\n\
       -l [hostname]                          - list available IPs\n\
       -s [v6/v4] [udp/tcp] [verbose (-v)]    - packet sniffer\n\
+      -i [ip address]                        - print information about ip (from ipinfo.io)\n\
       -t [hostname] [max ttl (default 30)]   - traceroute\n\n\
    example: %s -o google.com 75 90\n%s -s v4 all -v\n", argv, argv);
 }

@@ -2,7 +2,7 @@ CC=sudo gcc
 INCLUDE_DIR=include
 BUILD_DIR=build
 SRC_DIR=src
-CFLAGS=-I$(INCLUDE_DIR) -g
+CFLAGS=-I$(INCLUDE_DIR) -g -lcurl -lcjson
 
 SRC=$(wildcard *.c $(SRC_DIR)/*.c)
 OBJ=$(patsubst %.c,$(BUILD_DIR)/%.o,${SRC})

@@ -11,11 +11,13 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
+#include <cjson/cJSON.h>
+
 #define DATALEN 56
 #define PACKETS_COUNT 5
-#define PACKET_SIZE 4096 /* ping packet */
-#define TOTAL_SIZE 65536 /* buffer for packet in sniffer */ 
-#define BUFFER_SIZE 1500 /* traceroute packet */
+#define PACKET_SIZE 4096   /* ping packet */
+#define BUFFER_SIZE 1500   /* traceroute packet */
+#define TOTAL_SIZE  65536  /* buffer for packet in sniffer */ 
 #define WAIT_TIME 1
 #define PORT 30000
 #define MAX_PROBES 3
@@ -27,6 +29,10 @@
 #define UDP_ONLY 1<<2
 #define VERBOSE 1<<3
 
+struct memory_t {
+   char* memory;
+   size_t size;
+};
 
 struct PING_GLOBAL{
    int received_packets;
@@ -132,8 +138,6 @@ void send_loop(int max_ttl);
 int recv_udp_v6(int seq, struct timeval *time);
 int recv_udp(int seq, struct timeval *time);
 
-
-
 /****************** PACKET SNIFFER ***************************/
 
 void packet_sniffer(int proto, int flags);
@@ -142,5 +146,16 @@ void process_packet(unsigned char* buffer, int buffer_len, int flags);
 void print_dump(unsigned char* data, int len);
 void print_tcp(struct iphdr* hdr, unsigned char* buffer, int buff_len);
 void print_udp(struct iphdr* hdr, unsigned char* buffer, int buff_len);
+void print_icmp(struct iphdr* hdr, unsigned char* buffer, int buff_len);
+
+
+/****************** IP INFO ***************************/
+
+void ipinfo(char* ip);
+
+struct memory_t get_info(char* ip);
+size_t memory_callback(void *content, size_t size, size_t nmemb, void* userp);
+void   print_is_valid_json(cJSON* json, char* name);
+void   parse_info(struct memory_t info);
 
 #endif

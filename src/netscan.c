@@ -243,3 +243,25 @@ int cmp_addr(struct sockaddr* x, struct sockaddr* y){
    }
    return -1;
 }
+
+
+int capture_packet(int sockfd, struct packet_t* pckt){
+   int bytes;
+   socklen_t addr_size;
+
+   addr_size = sizeof(pckt->addr); 
+   bytes = recvfrom(sockfd, pckt->data, pckt->data_len, 0, (struct sockaddr*)&pckt->addr, &addr_size);
+   ASSERT(bytes);
+
+   return bytes;
+}
+int capture_packet_v6(int sockfd, struct packet_v6_t* pckt){
+   int bytes;
+   socklen_t addr_size;
+
+   addr_size = sizeof(pckt->addr); 
+   bytes = recvfrom(sockfd, pckt->data, pckt->data_len, 0, (struct sockaddr*)&pckt->addr, &addr_size);
+   ASSERT(bytes);
+
+   return bytes;
+}

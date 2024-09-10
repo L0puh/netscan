@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
    
    if (argc == 1) print_usage(argv[0]);
 
-   while((opt = getopt(argc, argv, "p:o:l:t:s:i:")) != -1){
+   while((opt = getopt(argc, argv, "p:o:l:t:s:i:v:")) != -1){
       switch(opt){
          case 'i':
             {
@@ -97,6 +97,14 @@ int main(int argc, char* argv[]) {
                packet_sniffer(proto, flags);
                break;
             }
+         case 'v':
+            {
+               int proto = AF_INET;
+               if (strcmp(optarg, "v6") == 0) proto = AF_INET6;
+               visualizer(proto);
+               break;
+            }
+
 
          default:
             print_usage(argv[0]);

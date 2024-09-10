@@ -135,13 +135,11 @@ void sig_int(int signo){
    exit(0);
 }
 
+
 void packet_sniffer(int proto, int flags){
    int sockfd, bytes;
    char *hostname, *str_ip;
-   socklen_t addr_size;
-   struct sockaddr_in addr;
    unsigned char buffer[TOTAL_SIZE];
-
   
    global.rcv_count = global.max_size = global.total_size = 0;
    gettimeofday(&global.time, NULL);
@@ -152,19 +150,29 @@ void packet_sniffer(int proto, int flags){
    signal(SIGINT, sig_int);
 
    while(1){
-      addr_size = sizeof(addr); 
-      bytes = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addr_size);
-      ASSERT(bytes);
-      hostname = get_hostname((struct sockaddr*)&addr);
-      str_ip = get_addr_str((struct sockaddr*)&addr);
+      if (proto == AF_INET){
+         struct packet_t pckt;
+         pckt.data = buffer;
+         pckt.data_len = sizeof(buffer);
+         bytes = capture_packet(sockfd, &pckt);
+         hostname = get_hostname((struct sockaddr*)&pckt.addr);
+         str_ip = get_addr_str((struct sockaddr*)&pckt.addr);
+      } else {
+         struct packet_v6_t pckt;
+         pckt.data = buffer;
+         pckt.data_len = sizeof(buffer);
+         bytes = capture_packet_v6(sockfd, &pckt);
+         hostname = get_hostname((struct sockaddr*)&pckt.addr);
+         str_ip = get_addr_str((struct sockaddr*)&pckt.addr);
+      }
 
       if (flags & SKIP_LOCALHOST){
          if (hostname != NULL)
             if (strcmp(hostname, "localhost") == 0) continue;
          if (strcmp(str_ip, "127.0.0.1") == 0) continue; //FIXME
       }
-
       printf("## Received a packet from %s (%s), total size: %d\n", hostname ? hostname: str_ip, str_ip, bytes);
+      
       global.rcv_count++;
       global.total_size += bytes;
       if (global.max_size < bytes) global.max_size = bytes;

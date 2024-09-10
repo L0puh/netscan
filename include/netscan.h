@@ -71,6 +71,20 @@ struct TRACEROUTE_GLOBAL {
    double max_time;
 };
 
+
+struct packet_t {
+   int bytes;
+   struct sockaddr_in addr;
+   unsigned char* data;
+   size_t data_len;
+};
+
+struct packet_v6_t {
+   int bytes;
+   struct sockaddr_in6 addr;
+   unsigned char* data;
+   size_t data_len;
+};
 typedef struct {
    unsigned short seq;
    unsigned short ttl;
@@ -106,6 +120,9 @@ static void sig_int(int signo);
 
 void* handle_thread(void* param);
 void search_ports(int *len, int start, int end, struct sockaddr_in server_addr, int *ports, pthread_mutex_t *mtx);
+
+int capture_packet(int sockfd, struct packet_t* pckt);
+int capture_packet_v6(int sockfd, struct packet_v6_t* pckt);
 
 /****************** PING ***************************/
 
@@ -157,5 +174,8 @@ struct memory_t get_info(char* ip);
 size_t memory_callback(void *content, size_t size, size_t nmemb, void* userp);
 void   print_is_valid_json(cJSON* json, char* name);
 void   parse_info(struct memory_t info);
+
+/****************** VISUALIZER ***************************/
+int visualizer(int proto);
 
 #endif

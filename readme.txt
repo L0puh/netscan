@@ -7,3 +7,8 @@ current features:
 - list IP addresses of a host 
 - packet sniffer 
 - list information about an ip address (parsed from ipinfo.io)
+
+dependencies: 
+- curl
+- cJSON
+- GLFW + glad 

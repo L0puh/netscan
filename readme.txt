@@ -11,4 +11,4 @@ current features:
 dependencies: 
 - curl
 - cJSON
-- GLFW + glad 
+- GLFW + glad + cglm

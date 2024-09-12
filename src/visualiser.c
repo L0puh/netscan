@@ -8,6 +8,7 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <cglm/cglm.h>
 
 
 const char* vertex_shader_src =  "#version 330 core\n"
@@ -132,7 +133,15 @@ int visualizer(int proto){
    const GLfloat bg[] = {0, 0, 0, 0};
    line.shader = create_shader();
 
-   glClearBufferfv(GL_COLOR, 0, bg);
+   float gap = 4.0f;
+   float *lines[10000];
+   float init_vertices[6] = {
+      0.0f, 0.0f, 0.0f,
+      0.0f, 0.0f, 0.0f
+   };
+
+   lines[0] = init_vertices;
+   int i = 0;
    while (!glfwWindowShouldClose(window)){
       glClearBufferfv(GL_COLOR, 0, bg);
       if (proto == AF_INET) {
@@ -150,13 +159,20 @@ int visualizer(int proto){
          hostname = get_hostname((struct sockaddr*)&pckt.addr);
          str_ip = get_addr_str((struct sockaddr*)&pckt.addr);
       }
-      float vertices[] = {
-         bytes * 0.01, bytes * 0.01, 0.0f,
-         0.0f, 0.0f, 0.0f,
+      float vertices[6] = {
+         lines[i][3], lines[i][4], 0.0f, 
+         lines[i][3] + gap, lines[i][4] + (bytes * 0.1), 0.0f,
       };
+     
+      i++;
       printf("%d bytes\n", bytes);
-      create_VAO(&line, vertices);
-      draw_line(line, bytes);
+      printf("[%d] %.2f %.2f - %.2f %.2f: ", i, vertices[0], vertices[1], vertices[3], vertices[4]);
+      
+      lines[i] = vertices; 
+      for (int k = 0; k < i; k++){
+         create_VAO(&line, lines[k]);
+         draw_line(line, bytes);
+      }
       glfwSwapBuffers(window);
       glfwPollEvents();
    }

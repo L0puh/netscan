@@ -6,16 +6,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <cglm/cglm.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <cglm/cglm.h>
 
 
 const char* vertex_shader_src =  "#version 330 core\n"
       "layout (location = 0) in vec3 pos;\n"
+      "uniform mat4 model;\n"
       "void main()\n"
       "{\n"
-      "  gl_Position = vec4(pos, 1.0);\n"
+      "  gl_Position = model * vec4(pos, 1.0);\n"
       "}\0";
 
 const char* fragment_shader_src = "#version 330 core\n"
@@ -58,8 +59,15 @@ struct line_t {
    unsigned int VBO, VAO;
 };
 
-void draw_line(struct line_t line, int bytes){
+void draw_line(struct line_t line, mat4 model){
+   int loc;
+   loc = glGetUniformLocation(line.shader, "model");
+   if (loc == -1) {
+      log_info(__func__, "location is invalid");
+      exit(-1);
+   }
    glUseProgram(line.shader);
+   glUniformMatrix4fv(loc, 1, GL_FALSE, &model[0][0]);
    glBindVertexArray(line.VAO);
    glDrawArrays(GL_LINES, 0, 2);
 }
@@ -97,7 +105,7 @@ int create_shader(){
 }
 
 
-void create_VAO(struct line_t *line, float *vertices){
+void create_VAO(struct line_t *line, float *vertices, size_t size){
    unsigned int VAO, VBO;
 
 
@@ -106,7 +114,7 @@ void create_VAO(struct line_t *line, float *vertices){
    glBindVertexArray(VAO);
    
    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+   glBufferData(GL_ARRAY_BUFFER, size, vertices, GL_STATIC_DRAW);
    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
    glEnableVertexAttribArray(0);
 
@@ -120,7 +128,6 @@ void create_VAO(struct line_t *line, float *vertices){
 int visualizer(int proto){
    struct line_t line;
    int sockfd, bytes;
-   char *hostname, *str_ip;
    GLFWwindow *window;
    unsigned char buffer[TOTAL_SIZE];
 
@@ -131,51 +138,46 @@ int visualizer(int proto){
    window = init_window(); 
    
    const GLfloat bg[] = {0, 0, 0, 0};
+
    line.shader = create_shader();
-
    float gap = 4.0f;
-   float *lines[10000];
-   float init_vertices[6] = {
-      0.0f, 0.0f, 0.0f,
-      0.0f, 0.0f, 0.0f
-   };
 
-   lines[0] = init_vertices;
+   vec3 start_pos = {-1.0f, -1.0f, 0.0f}; 
+   vec3 end_pos = {1.0f, 1.0f, 0.0f}; 
    int i = 0;
+
    while (!glfwWindowShouldClose(window)){
       glClearBufferfv(GL_COLOR, 0, bg);
-      if (proto == AF_INET) {
-         struct packet_t pckt;
-         pckt.data = buffer;
-         pckt.data_len = sizeof(buffer);
-         bytes = capture_packet(sockfd, &pckt);
-         hostname = get_hostname((struct sockaddr*)&pckt.addr);
-         str_ip = get_addr_str((struct sockaddr*)&pckt.addr);
-      } else {
-         struct packet_v6_t pckt;
-         pckt.data = buffer;
-         pckt.data_len = sizeof(buffer);
-         bytes = capture_packet_v6(sockfd, &pckt);
-         hostname = get_hostname((struct sockaddr*)&pckt.addr);
-         str_ip = get_addr_str((struct sockaddr*)&pckt.addr);
-      }
-      float vertices[6] = {
-         lines[i][3], lines[i][4], 0.0f, 
-         lines[i][3] + gap, lines[i][4] + (bytes * 0.1), 0.0f,
+
+      float init_vertices[6] = {
+         start_pos[0], start_pos[1], start_pos[2],
+         end_pos[0], end_pos[1], end_pos[2]
       };
-     
-      i++;
-      printf("%d bytes\n", bytes);
-      printf("[%d] %.2f %.2f - %.2f %.2f: ", i, vertices[0], vertices[1], vertices[3], vertices[4]);
-      
-      lines[i] = vertices; 
-      for (int k = 0; k < i; k++){
-         create_VAO(&line, lines[k]);
-         draw_line(line, bytes);
-      }
+      mat4 model = {1.0f};
+      vec3 pos = {0.0f, 0.0f, 0.0f};
+      glm_translate(model, pos);
+      create_VAO(&line, init_vertices, sizeof init_vertices);
+      draw_line(line, model); 
+
       glfwSwapBuffers(window);
       glfwPollEvents();
    }
 
    return 0;
+}
+
+int get_bytes(int sockfd, int proto, unsigned char* buffer){
+   int bytes;
+   if (proto == AF_INET) {
+      struct packet_t pckt;
+      pckt.data = buffer;
+      pckt.data_len = sizeof(buffer);
+      bytes = capture_packet(sockfd, &pckt);
+   } else {
+      struct packet_v6_t pckt;
+      pckt.data = buffer;
+      pckt.data_len = sizeof(buffer);
+      bytes = capture_packet_v6(sockfd, &pckt);
+   }
+   return bytes;
 }

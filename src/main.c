@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
             {
                int proto = AF_INET;
                if (strcmp(optarg, "v6") == 0) proto = AF_INET6;
-               visualizer(proto);
+               visualiser(proto);
                break;
             }
 

@@ -6,9 +6,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <cglm/cglm.h>
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
 
 
 const char* vertex_shader_src =  "#version 330 core\n"
@@ -25,7 +22,6 @@ const char* fragment_shader_src = "#version 330 core\n"
       "{\n"
       "  FragColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);\n"
       "}\0";
-
 
 void sig_int(int signo){
    exit(0);
@@ -54,22 +50,17 @@ GLFWwindow* init_window(){
 }
 
 
-struct line_t {
-   int shader;
-   unsigned int VBO, VAO;
-};
-
-void draw_line(struct line_t line, mat4 model){
+void draw(struct object_t obj){
    int loc;
-   loc = glGetUniformLocation(line.shader, "model");
+   loc = glGetUniformLocation(obj.shader, "model");
    if (loc == -1) {
       log_info(__func__, "location is invalid");
       exit(-1);
    }
-   glUseProgram(line.shader);
-   glUniformMatrix4fv(loc, 1, GL_FALSE, &model[0][0]);
-   glBindVertexArray(line.VAO);
-   glDrawArrays(GL_LINES, 0, 2);
+   glUseProgram(obj.shader);
+   glUniformMatrix4fv(loc, 1, GL_FALSE, &obj.model[0][0]);
+   glBindVertexArray(obj.VAO);
+   glDrawArrays(GL_POINTS, 0, 1);
 }
 
 
@@ -105,7 +96,7 @@ int create_shader(){
 }
 
 
-void create_VAO(struct line_t *line, float *vertices, size_t size){
+void create_VAO(struct object_t *obj, float *vertices, size_t size){
    unsigned int VAO, VBO;
 
 
@@ -121,44 +112,58 @@ void create_VAO(struct line_t *line, float *vertices, size_t size){
    glBindBuffer(GL_ARRAY_BUFFER, 0);
    glBindVertexArray(0);
 
-   line->VAO = VAO;
-   line->VBO = VBO;
+   obj->VAO = VAO;
+   obj->VBO = VBO;
 }
 
-int visualizer(int proto){
-   struct line_t line;
+
+int visualiser(int proto){
+   mat4 model;
+   struct object_t obj;
    int sockfd, bytes;
    GLFWwindow *window;
    unsigned char buffer[TOTAL_SIZE];
 
    sockfd = socket(proto, SOCK_RAW, IPPROTO_TCP);
    setuid(getuid());
-
    signal(SIGINT, sig_int);
    window = init_window(); 
+   obj.shader = create_shader();
+  
+   vec3 init_pos = {0.5f, 0.5f, 0.0f}; 
    
+   float init_vertices[] = {
+      init_pos[0], init_pos[1], init_pos[2],
+   };
+  
+   vec3 pos = {0.0f, 0.0f, 0.0f};
    const GLfloat bg[] = {0, 0, 0, 0};
+   
+   create_VAO(&obj, init_vertices, sizeof init_vertices);
 
-   line.shader = create_shader();
-   float gap = 4.0f;
-
-   vec3 start_pos = {-1.0f, -1.0f, 0.0f}; 
-   vec3 end_pos = {1.0f, 1.0f, 0.0f}; 
+   const int MAX_DOTS = 10000;
+   vec3 dots[MAX_DOTS];
+   float gap = 0.002;
    int i = 0;
-
+   glm_vec3_copy(pos, dots[i++]);
    while (!glfwWindowShouldClose(window)){
       glClearBufferfv(GL_COLOR, 0, bg);
 
-      float init_vertices[6] = {
-         start_pos[0], start_pos[1], start_pos[2],
-         end_pos[0], end_pos[1], end_pos[2]
-      };
-      mat4 model = {1.0f};
-      vec3 pos = {0.0f, 0.0f, 0.0f};
-      glm_translate(model, pos);
-      create_VAO(&line, init_vertices, sizeof init_vertices);
-      draw_line(line, model); 
+      bytes = get_bytes(sockfd, proto, buffer);
+      pos[0] += gap;
+      pos[1] = (bytes * 0.001); 
+      if (i+1 < MAX_DOTS)
+         glm_vec3_copy(pos, dots[i++]);
 
+      /* TODO : check bounds, add allocation, scale the picture up */
+      printf("%d : %.3f %.3f\n", bytes, pos[0], pos[1]);
+      for (int j = 0; j < i; j++)
+      {
+         glm_mat4_identity(model);
+         glm_translate(model, dots[j]);
+         glm_mat4_copy(model, obj.model);
+         draw(obj); 
+      }
       glfwSwapBuffers(window);
       glfwPollEvents();
    }
@@ -171,12 +176,12 @@ int get_bytes(int sockfd, int proto, unsigned char* buffer){
    if (proto == AF_INET) {
       struct packet_t pckt;
       pckt.data = buffer;
-      pckt.data_len = sizeof(buffer);
+      pckt.data_len = TOTAL_SIZE; 
       bytes = capture_packet(sockfd, &pckt);
    } else {
       struct packet_v6_t pckt;
       pckt.data = buffer;
-      pckt.data_len = sizeof(buffer);
+      pckt.data_len = TOTAL_SIZE; 
       bytes = capture_packet_v6(sockfd, &pckt);
    }
    return bytes;

@@ -13,6 +13,13 @@
 
 #include <cjson/cJSON.h>
 
+#include <cglm/cglm.h>
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <cglm/affine.h>
+#include <cglm/mat4.h>
+#include <cglm/vec3.h>
+
 #define DATALEN 56
 #define PACKETS_COUNT 5
 #define PACKET_SIZE 4096   /* ping packet */
@@ -102,6 +109,12 @@ typedef struct {
    struct sockaddr_in serv;
 } ports_param_t;
 
+struct object_t{
+   int shader;
+   mat4 model;
+   unsigned int VBO, VAO;
+};
+
 /****************** NETSCAN ***************************/
 
 int   get_ip_version(const char* host);
@@ -176,6 +189,13 @@ void   print_is_valid_json(cJSON* json, char* name);
 void   parse_info(struct memory_t info);
 
 /****************** VISUALIZER ***************************/
-int visualizer(int proto);
+
+GLFWwindow* init_window();
+
+int  visualiser(int proto);
+int  get_bytes(int sockfd, int proto, unsigned char* buffer);
+int  create_shader();
+void draw(struct object_t obj);
+void create_VAO(struct object_t*, float *vertices, size_t size);
 
 #endif

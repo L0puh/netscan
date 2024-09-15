@@ -1,12 +1,14 @@
 #include "netscan.h"
 #include "utils.h"
 
+#include <GL/gl.h>
+#include <cglm/vec3.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-
+static struct VISUALISER_GLOBAL global;
 
 const char* vertex_shader_src =  "#version 330 core\n"
       "layout (location = 0) in vec3 pos;\n"
@@ -32,6 +34,9 @@ GLFWwindow* init_window(){
    GLFWwindow *window;
    const float width = 400, heigth = 400;
 
+   global.window_width = width;
+   global.window_height = heigth;
+
    if (!glfwInit()) {
       log_info(__func__, "error in glfw init");
       exit(-1);
@@ -46,6 +51,7 @@ GLFWwindow* init_window(){
       log_info(__func__, "error in glad load");
       exit(-1);
    }
+   glfwSetFramebufferSizeCallback(window, frame_buffer_size);
    return window;
 }
 
@@ -130,13 +136,13 @@ int visualiser(int proto){
    window = init_window(); 
    obj.shader = create_shader();
   
-   vec3 init_pos = {0.5f, 0.5f, 0.0f}; 
-   
+   vec3 pos;
+   vec3 init_pos = {-0.5f, 0.0f, 0.0f}; 
    float init_vertices[] = {
       init_pos[0], init_pos[1], init_pos[2],
    };
   
-   vec3 pos = {0.0f, 0.0f, 0.0f};
+   glm_vec3_copy(init_pos, pos);
    const GLfloat bg[] = {0, 0, 0, 0};
    
    create_VAO(&obj, init_vertices, sizeof init_vertices);
@@ -144,19 +150,26 @@ int visualiser(int proto){
    const int MAX_DOTS = 10000;
    vec3 dots[MAX_DOTS];
    float gap = 0.002;
+   glPointSize(5.0f);
    int i = 0;
    glm_vec3_copy(pos, dots[i++]);
+
+
+
    while (!glfwWindowShouldClose(window)){
       glClearBufferfv(GL_COLOR, 0, bg);
 
       bytes = get_bytes(sockfd, proto, buffer);
+      if (bytes <= 8) continue;
+
       pos[0] += gap;
       pos[1] = (bytes * 0.001); 
-      if (i+1 < MAX_DOTS)
+      if (i+1 < MAX_DOTS) {
          glm_vec3_copy(pos, dots[i++]);
+      } else {
+         i = 0; glm_vec3_copy(init_pos, pos);
+      }
 
-      /* TODO : check bounds, add allocation, scale the picture up */
-      printf("%d : %.3f %.3f\n", bytes, pos[0], pos[1]);
       for (int j = 0; j < i; j++)
       {
          glm_mat4_identity(model);
@@ -169,6 +182,12 @@ int visualiser(int proto){
    }
 
    return 0;
+}
+
+void frame_buffer_size(GLFWwindow *window, int width, int height){
+   glViewport(0, 0, width, height);
+   global.window_width = width;
+   global.window_height = height;
 }
 
 int get_bytes(int sockfd, int proto, unsigned char* buffer){

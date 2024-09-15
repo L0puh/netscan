@@ -41,6 +41,11 @@ struct memory_t {
    size_t size;
 };
 
+struct VISUALISER_GLOBAL {
+   float window_width;
+   float window_height;
+};
+
 struct PING_GLOBAL{
    int received_packets;
    int sent_packets;
@@ -197,5 +202,6 @@ int  get_bytes(int sockfd, int proto, unsigned char* buffer);
 int  create_shader();
 void draw(struct object_t obj);
 void create_VAO(struct object_t*, float *vertices, size_t size);
+void frame_buffer_size(GLFWwindow *window, int width, int height);
 
 #endif

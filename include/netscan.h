@@ -13,12 +13,8 @@
 
 #include <cjson/cJSON.h>
 
-#include <cglm/cglm.h>
-#include <glad/glad.h>
+#include <GL/gl.h>
 #include <GLFW/glfw3.h>
-#include <cglm/affine.h>
-#include <cglm/mat4.h>
-#include <cglm/vec3.h>
 
 #define DATALEN 56
 #define PACKETS_COUNT 5
@@ -30,6 +26,7 @@
 #define MAX_PROBES 3
 #define MAX_IPS 40
 #define DEFAULT_THREADS 5
+#define MAX_DOTS 10000
 
 #define SKIP_LOCALHOST 1<<0
 #define TCP_ONLY 1<<1
@@ -42,6 +39,7 @@ struct memory_t {
 };
 
 struct VISUALISER_GLOBAL {
+   float speed;
    float window_width;
    float window_height;
 };
@@ -114,11 +112,6 @@ typedef struct {
    struct sockaddr_in serv;
 } ports_param_t;
 
-struct object_t{
-   int shader;
-   mat4 model;
-   unsigned int VBO, VAO;
-};
 
 /****************** NETSCAN ***************************/
 
@@ -199,9 +192,6 @@ GLFWwindow* init_window();
 
 int  visualiser(int proto);
 int  get_bytes(int sockfd, int proto, unsigned char* buffer);
-int  create_shader();
-void draw(struct object_t obj);
-void create_VAO(struct object_t*, float *vertices, size_t size);
 void frame_buffer_size(GLFWwindow *window, int width, int height);
 
 #endif

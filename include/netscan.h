@@ -26,7 +26,7 @@
 #define MAX_PROBES 3
 #define MAX_IPS 40
 #define DEFAULT_THREADS 5
-#define MAX_DOTS 10000
+#define MAX_DOTS 100000
 
 #define SKIP_LOCALHOST 1<<0
 #define TCP_ONLY 1<<1
@@ -40,6 +40,7 @@ struct memory_t {
 
 struct VISUALISER_GLOBAL {
    float speed;
+   float scale;
    float window_width;
    float window_height;
 };

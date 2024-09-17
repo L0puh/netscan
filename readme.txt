@@ -7,8 +7,9 @@ current features:
 - list IP addresses of a host 
 - packet sniffer 
 - list information about an ip address (parsed from ipinfo.io)
+- visualization of in-coming traffic 
 
 dependencies: 
 - curl
 - cJSON
-- GLFW + glad + cglm
+- GLFW (with openGL)

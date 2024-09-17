@@ -2,61 +2,65 @@
 #include "utils.h"
 
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
 
 static struct VISUALISER_GLOBAL global;
 
-void sig_int(int signo){
-   exit(0);
-}
+void sig_int(int signo){ exit(0); }
 
 GLFWwindow* init_window(){
    GLFWwindow *window;
-   const float width = 640, heigth = 400;
+   const float width = 640, heigth = 480;
 
    global.window_width = width;
    global.window_height = heigth;
+
+   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
    if (!glfwInit()) {
       log_info(__func__, "error in glfw init");
       exit(-1);
    }
-   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
    window = glfwCreateWindow(width, heigth, "window", 0, 0);
+
    if (!window){
+      glfwTerminate();
       log_info(__func__, "failed create window");
       exit(-1);
    }
    glfwMakeContextCurrent(window);
-   
-   frame_buffer_size(window, width, heigth);
-   glMatrixMode(GL_PROJECTION);
-   glLoadIdentity();
+  
    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
    glColor3f(1.0f, 0.0f, 0.0f);
+   glMatrixMode(GL_PROJECTION);
+   glLoadIdentity();
+
    glfwSetFramebufferSizeCallback(window, frame_buffer_size);
 
    return window;
 }
 
 
-void draw_function(){
+void draw_function(float *bytes, size_t size){
+   float lim, y, x;
+
+   lim = global.window_width;
    glBegin(GL_LINE_STRIP);
-   float lim = global.window_width;
-   for (float x = -1 * lim; x <= lim; x += 1) {
-     float y = 100.0 * sin(x * (M_PI / 180)); 
-     glVertex2f(x, y); 
-     glVertex2f(x + 1, 100.0 * sin((x + 1) * (M_PI / 180)));
+   
+   x = -lim;
+   for (int i = 0; i < size; i++) {
+      x += global.speed;
+      if (x >= lim) x = -lim;
+      y = bytes[i++]; 
+      glVertex2f(x, y);
    }
    glEnd();
 }
-
-
 
 int visualiser(int proto){
    int sockfd, bytes;
@@ -69,16 +73,20 @@ int visualiser(int proto){
    signal(SIGINT, sig_int);
 
    window = init_window(); 
-   global.speed = 0.02f;
-  
-
+   global.speed = 10.5f;
+   global.scale = 10.0f;
+   
+   int i = 0;
    while (!glfwWindowShouldClose(window)){
       glClear(GL_COLOR_BUFFER_BIT);
 
-      /* bytes = get_bytes(sockfd, proto, buffer); */
-      /* if (i + 1 < MAX_DOTS) */
-         /* dots[i++] = bytes * 0.01f; */
-      draw_function();
+      bytes = get_bytes(sockfd, proto, buffer);
+      if (i + 1 < MAX_DOTS)
+         dots[i++] = sin(bytes) * (global.window_height/global.scale);
+      else i = 0;
+
+      printf("[%d]: %d bytes\n", i, bytes);
+      draw_function(dots, i);
       glfwSwapBuffers(window);
       glfwPollEvents();
    }

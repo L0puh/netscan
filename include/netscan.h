@@ -13,9 +13,6 @@
 
 #include <cjson/cJSON.h>
 
-#include <GL/gl.h>
-#include <GLFW/glfw3.h>
-
 #define DATALEN 56
 #define PACKETS_COUNT 5
 #define PACKET_SIZE 4096   /* ping packet */
@@ -39,10 +36,15 @@ struct memory_t {
 };
 
 struct VISUALISER_GLOBAL {
+   int i;
+   int proto;
+   int sockfd;
    float speed;
    float scale;
    float window_width;
    float window_height;
+   float* dots;
+   unsigned char* buffer;
 };
 
 struct PING_GLOBAL{
@@ -189,10 +191,13 @@ void   parse_info(struct memory_t info);
 
 /****************** VISUALIZER ***************************/
 
-GLFWwindow* init_window();
-
 int  visualiser(int proto);
 int  get_bytes(int sockfd, int proto, unsigned char* buffer);
-void frame_buffer_size(GLFWwindow *window, int width, int height);
+void display(void);
+void text_output(int x, int y, char* string);
+void reshape(int width, int height);
+void tick();
+void draw_function(float *bytes, size_t size);
+void init_glut();
 
 #endif

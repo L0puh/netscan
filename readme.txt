@@ -12,4 +12,4 @@ current features:
 dependencies: 
 - curl
 - cJSON
-- GLFW (with openGL)
+- glut 

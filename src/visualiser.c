@@ -4,6 +4,7 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +37,13 @@ void reshape(int width, int height){
 
 void tick() { glutPostRedisplay(); }
 
+void skip_localhost(int choice){
+   if (choice) {
+      global.skip_localhost = !global.skip_localhost;
+      printf("[+] localhost is %s\n", global.skip_localhost ? "OFF": "ON");
+   }
+}
+
 void init_glut(){
    int argc = 0;
    const float width = 640, heigth = 480;
@@ -48,9 +56,15 @@ void init_glut(){
    glutInitWindowSize(width, heigth);
    glutCreateWindow("window");
    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+   
    glutDisplayFunc(display);
    glutReshapeFunc(reshape);
    glutIdleFunc(tick);
+
+   int menu = glutCreateMenu(skip_localhost);
+   glutAddMenuEntry("skip localhost", 1);
+   glutAttachMenu(GLUT_RIGHT_BUTTON);
+   
    glutMainLoop();
 
 }
@@ -63,16 +77,19 @@ void draw_function(float *bytes, size_t size){
    glColor3f(1.0f, 0.0f, 0.0f);
    
    x = -lim;
+   pthread_mutex_lock(&global.mtx);
    for (int i = 0; i < size; i++) {
       x += global.speed;
       if (x >= lim) x = -lim;
       y = bytes[i++]; 
       glVertex2f(x, y);
    }
+   pthread_mutex_unlock(&global.mtx);
    glEnd();
 }
 
 int visualiser(int proto){
+   pthread_t ptr;
    int sockfd, bytes;
    float *dots = malloc(MAX_DOTS);
    unsigned char *buffer = malloc(TOTAL_SIZE);
@@ -82,6 +99,8 @@ int visualiser(int proto){
    signal(SIGINT, sig_int);
    
    global.speed = 10.5f;
+   global.last_hostname = malloc(1024);
+   global.msg = malloc(1024);
    global.scale = 100.0f;
    global.buffer = buffer;
    global.dots = dots;
@@ -89,10 +108,14 @@ int visualiser(int proto){
    global.proto = proto;
    global.i = 0;
    
+   pthread_mutex_init(&global.mtx, 0);
+   pthread_create(&ptr, NULL, process_bytes, (void*)&global.i);
+   pthread_detach(ptr);
    init_glut();
 
    free(dots);
    free(buffer);
+   free(global.last_hostname);
   
    return 0;
 }
@@ -100,37 +123,63 @@ int visualiser(int proto){
 
 int get_bytes(int sockfd, int proto, unsigned char* buffer){
    int bytes;
+   char *ip_str, *hostname;
+   struct sockaddr* addr;
    if (proto == AF_INET) {
       struct packet_t pckt;
       pckt.data = buffer;
       pckt.data_len = TOTAL_SIZE; 
       bytes = capture_packet(sockfd, &pckt);
+      addr = (struct sockaddr*)&pckt.addr;
    } else {
       struct packet_v6_t pckt;
       pckt.data = buffer;
       pckt.data_len = TOTAL_SIZE; 
       bytes = capture_packet_v6(sockfd, &pckt);
+      addr = (struct sockaddr*)&pckt.addr;
+   }
+   hostname = get_hostname(addr);
+   if (hostname != NULL) 
+      global.last_hostname = hostname;
+   else {
+      ip_str = get_addr_str(addr);
+      global.last_hostname = ip_str;
    }
    return bytes;
 }
 
-void display(void){
+void* process_bytes(void* p){
+   int bytes, i=global.i;
    char *msg = malloc(2048);
-   int bytes, i = global.i;
+   while(1) {
+      bytes = get_bytes(global.sockfd, global.proto, global.buffer);
+      if (global.skip_localhost && strcmp(global.last_hostname, "localhost") == 0)
+         continue;
+      sprintf(msg, "[%d] %d bytes: %s", i, bytes, global.last_hostname);
+     
+      pthread_mutex_lock(&global.mtx);
+      if (i + 1 < MAX_DOTS){
+         global.dots[i++] = sin(bytes) * global.scale;
+      } else i = 0;
+
+      global.i = i;
+      global.msg = msg;
+
+      pthread_mutex_unlock(&global.mtx);
+   }
+      
+   free(msg);
+   pthread_exit(NULL);
+}
+
+void display(void){
+   int bytes=0, i = global.i;
   
    glClear(GL_COLOR_BUFFER_BIT);
 
-   bytes = get_bytes(global.sockfd, global.proto, global.buffer);
-   /* bytes = random() * 0.000001f; */
-   if (i + 1 < MAX_DOTS)
-      global.dots[global.i++] = sin(bytes) * global.scale;
-   else i = 0;
-
-   sprintf(msg, "[%d] %d bytes", i, bytes);
    glColor3f(0.0f, 1.0f, 0.0f);
-   text_output(-(global.window_width*0.9), (global.window_height*0.5), msg); 
+   text_output(-(global.window_width*0.9), (global.window_height*0.5), global.msg); 
    draw_function(global.dots, i);
-
+   
    glutSwapBuffers();
-   free(msg);
 }

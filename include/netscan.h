@@ -3,6 +3,7 @@
 
 #include <netdb.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <arpa/inet.h>
 
 #include <netinet/ip.h>
@@ -38,13 +39,17 @@ struct memory_t {
 struct VISUALISER_GLOBAL {
    int i;
    int proto;
+   int skip_localhost;
    int sockfd;
    float speed;
    float scale;
    float window_width;
    float window_height;
    float* dots;
+   char* last_hostname;
+   char* msg;
    unsigned char* buffer;
+   pthread_mutex_t mtx;
 };
 
 struct PING_GLOBAL{
@@ -199,5 +204,6 @@ void reshape(int width, int height);
 void tick();
 void draw_function(float *bytes, size_t size);
 void init_glut();
+void* process_bytes(void*);
 
 #endif

@@ -24,15 +24,19 @@
 -v [v4/v6]                             - visualize traffic
 -t [hostname] [max ttl (default 30)]   - traceroute
 ```
+
+## screenshots:
+- packet sniffer:
+![](https://github.com/L0puh/netscan/blob/master/media/1.png)
+- list IPs and information of IP
+![](https://github.com/L0puh/netscan/blob/master/media/2.png)
+- ping host and list open ports
+![](https://github.com/L0puh/netscan/blob/master/media/3.png)
+- visualize incoming traffic 
+![](https://github.com/L0puh/netscan/blob/master/media/4.png)
+
 ## example: 
 ```sh
 ./netscan -o google.com 75 90 10
 ./netscan -s v4 all -v
 ```
-
-## screenshots:
-
-![](https://github.com/L0puh/netscan/blob/master/media/1.png)
-![](https://github.com/L0puh/netscan/blob/master/media/2.png)
-![](https://github.com/L0puh/netscan/blob/master/media/3.png)
-![](https://github.com/L0puh/netscan/blob/master/media/4.png)

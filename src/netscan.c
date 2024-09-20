@@ -55,9 +55,6 @@ void search_ports
                break;
                
          default:
-#ifdef VERBOSE
-            printf("\t%d is closed\n", i);
-#endif 
                break;
          }
       close(sockfd);

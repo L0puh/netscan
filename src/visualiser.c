@@ -15,7 +15,6 @@ static struct VISUALISER_GLOBAL global;
 
 void sig_int(int signo){ exit(0); }
 
-
 void text_output(int x, int y, char* string){
    int len;
 

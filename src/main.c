@@ -121,6 +121,7 @@ void print_usage(char* argv){
       -l [hostname]                          - list available IPs\n\
       -s [v6/v4] [udp/tcp] [verbose (-v)]    - packet sniffer\n\
       -i [ip address]                        - print information about ip (from ipinfo.io)\n\
+      -v [v4/v6]                             - visualize traffic\n\
       -t [hostname] [max ttl (default 30)]   - traceroute\n\n\
    example: %s -o google.com 75 90\n%s -s v4 all -v\n", argv, argv);
 }
